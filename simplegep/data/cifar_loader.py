@@ -19,12 +19,14 @@ def get_transform_test():
         ])
     return transform_test
 
-def get_train_loader(root, batchsize, transform_train):
+def get_train_loader(root, batchsize):
+    transform_train = get_transform_train()
     trainset = torchvision.datasets.CIFAR10(root=root, train=True, download=True, transform=transform_train)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=batchsize, shuffle=True, num_workers=2)
     return trainloader
 
-def get_test_loader(root, batchsize, transform_test):
+def get_test_loader(root, batchsize):
+    transform_test = get_transform_test()
     testset = torchvision.datasets.CIFAR10(root=root, train=False, download=True, transform=transform_test)
     testloader = torch.utils.data.DataLoader(testset, batch_size=batchsize, shuffle=False, num_workers=2)
     return testloader

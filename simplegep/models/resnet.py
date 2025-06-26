@@ -1,7 +1,6 @@
-import torch
-import torch.nn as nn
-import numpy as np
 import math
+import torch
+from torch import nn
 
 
 # The ResNet models for CIFAR in https://arxiv.org/abs/1512.03385.

@@ -6,7 +6,7 @@ from tqdm import tqdm
 from simplegep.data.cifar_loader import get_train_loader, get_transform_train, get_test_loader, get_transform_test
 from simplegep.dp.dp_params import get_dp_params
 from simplegep.dp.dp_sgd import GradsProcessor
-from simplegep.dp.per_sample_grad import pretrain_actions, backward
+from simplegep.dp.per_sample_grad import pretrain_actions, backward_pass_get_batch_grads
 from simplegep.models.factory import get_model
 from simplegep.models.utils import initialize_weights, count_parameters
 from simplegep.trainers.loss_function_factory import get_loss_function
@@ -26,7 +26,7 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor):
         batch_acc = correct_predictions.sum().item() / len(correct_predictions)
         train_acc += batch_acc
         train_loss += loss.item()
-        flat_per_sample_grads = backward(loss=loss, net=net)
+        flat_per_sample_grads = backward_pass_get_batch_grads(batch_loss=loss, net=net)
         processed_grads = grads_processor.process_grads(flat_per_sample_grads)
         offset = 0
         for param in net.parameters() :

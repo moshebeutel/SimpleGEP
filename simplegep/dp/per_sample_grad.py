@@ -10,10 +10,11 @@ def pretrain_actions(model, loss_func):
     loss_func = extend(loss_func)
     return model, loss_func
 
-def backward(loss: torch.Tensor, net: torch.nn.Module) -> torch.Tensor:
+
+def backward_pass_get_batch_grads(batch_loss: torch.Tensor, net: torch.nn.Module) -> torch.Tensor:
     grad_batch_list = []
     with backpack(BatchGrad()):
-        loss.backward()
+        batch_loss.backward()
     for p in net.parameters():
         grad_batch_list.append(p.grad_batch.reshape(p.grad_batch.shape[0], -1))
         p.grad_batch = p.grad_batch.detach().cpu()
@@ -27,4 +28,3 @@ def backward(loss: torch.Tensor, net: torch.nn.Module) -> torch.Tensor:
     del grad_batch_list
 
     return flat_grad_batch_tensor
-

@@ -1,4 +1,5 @@
 import argparse
+import gc
 import logging
 import os
 import random
@@ -6,6 +7,7 @@ import time
 from pathlib import Path
 import numpy as np
 import torch
+from tqdm import tqdm
 
 
 def parse_args(description: str):
@@ -32,6 +34,10 @@ def parse_args(description: str):
                         help='clip strategy name: value, median, max')
     parser.add_argument('--clip_value', default=5., type=float, help='gradient clipping bound')
     parser.add_argument('--eps', default=8., type=float, help='privacy parameter epsilon')
+
+    ## arguments for GEP
+    parser.add_argument('--num_basis', default=100, type=int, help='total number of basis elements')
+
 
     args = parser.parse_args()
     return args
@@ -100,3 +106,30 @@ def set_logger(logger_name: str, log_dir: str, level=logging.INFO) -> logging.Lo
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
     return logger
+
+
+@torch.no_grad()
+def eval_model(net, loss_function, loader):
+    net.eval()
+    test_loss, test_acc = 0.0, 0.0
+    pbar = tqdm(enumerate(loader), total=len(loader))
+
+    for batch_idx, (data, target) in enumerate(loader):
+        data, target = data.cuda(), target.cuda()
+        output = net(data)
+        loss = loss_function(output, target)
+        correct_predictions = torch.eq(output.argmax(dim=1), target)
+        batch_acc = correct_predictions.sum().item() / len(correct_predictions)
+        test_acc += batch_acc
+        test_loss += loss.item()
+        pbar.set_description(f'Batch {batch_idx}/{len(loader)} train loss {loss.item()} train accuracy {batch_acc}')
+
+        data, target, output, loss, correct_predictions = (data.detach().cpu(), target.detach().cpu(),
+                                                           output.detach().cpu(), loss.detach().cpu(),
+                                                           correct_predictions.detach().cpu())
+        data, target, output, loss, correct_predictions = None, None, None, None, None
+        del data, target, output, loss, correct_predictions
+        gc.collect()
+        torch.cuda.empty_cache()
+
+    return test_loss, test_acc

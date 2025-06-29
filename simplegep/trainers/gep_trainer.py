@@ -6,6 +6,8 @@ from simplegep.data.cifar_loader import get_train_loader, get_test_loader
 from simplegep.dp.dp_params import get_dp_params
 from simplegep.dp.dp_sgd import GradsProcessor
 from simplegep.dp.per_sample_grad import pretrain_actions, backward
+from simplegep.embeddings.embedder import Embedder
+from simplegep.embeddings.svd_embedder import SVDEmbedder
 from simplegep.models.factory import get_model
 from simplegep.models.utils import initialize_weights, count_parameters
 from simplegep.trainers.loss_function_factory import get_loss_function
@@ -13,7 +15,11 @@ from simplegep.trainers.optimizer_factory import get_optimizer
 from simplegep.utils import eval_model
 
 
-def train_epoch(net, loss_function, optimizer, train_loader, grads_processor):
+def train_epoch(net, loss_function, optimizer, train_loader, grads_processor, embedder: Embedder, ):
+
+    embedder.calc_embedding_space()
+
+
     train_loss, train_acc = 0.0, 0.0
     net.train()
     pbar = tqdm(enumerate(train_loader), total=len(train_loader))
@@ -88,6 +94,8 @@ def train(args, logger: logging.Logger):
     grads_processor = GradsProcessor(clip_strategy_name=args.clip_strategy,
                                      noise_multiplier=dp_params.sigma,
                                      clip_value=args.clip_value)
+
+    embedder = SVDEmbedder(args.num_basis)
 
     net = net.cuda()
     for epoch in range(args.num_epochs):

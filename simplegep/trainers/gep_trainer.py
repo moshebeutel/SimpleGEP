@@ -1,11 +1,12 @@
 import gc
 import logging
 import torch
+import torchvision
 from tqdm import tqdm
 from simplegep.data.cifar_loader import get_train_loader, get_test_loader
 from simplegep.dp.dp_params import get_dp_params
 from simplegep.dp.dp_sgd import GradsProcessor
-from simplegep.dp.per_sample_grad import pretrain_actions, backward
+from simplegep.dp.per_sample_grad import pretrain_actions, backward_pass_get_batch_grads, PublicDataPerSampleGrad
 from simplegep.embeddings.embedder import Embedder
 from simplegep.embeddings.svd_embedder import SVDEmbedder
 from simplegep.models.factory import get_model
@@ -15,9 +16,9 @@ from simplegep.trainers.optimizer_factory import get_optimizer
 from simplegep.utils import eval_model
 
 
-def train_epoch(net, loss_function, optimizer, train_loader, grads_processor, embedder: Embedder, ):
-
-    embedder.calc_embedding_space()
+def train_epoch(net, loss_function, optimizer, train_loader, grads_processor, embedder: Embedder, pub_data_grads: PublicDataPerSampleGrad):
+    pub_grads = pub_data_grads.get_grads(current_state_dict=net.state_dict())
+    embedder.calc_embedding_space(pub_grads)
 
 
     train_loss, train_acc = 0.0, 0.0
@@ -32,7 +33,7 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor, em
         batch_acc = correct_predictions.sum().item() / len(correct_predictions)
         train_acc += batch_acc
         train_loss += loss.item()
-        flat_per_sample_grads = backward(loss=loss, net=net)
+        flat_per_sample_grads = backward_pass_get_batch_grads(batch_loss=loss, net=net)
         processed_grads = grads_processor.process_grads(flat_per_sample_grads)
         offset = 0
         for param in net.parameters() :
@@ -95,16 +96,56 @@ def train(args, logger: logging.Logger):
                                      noise_multiplier=dp_params.sigma,
                                      clip_value=args.clip_value)
 
+    logger.debug(f'Created GradsProcessor with strategy {args.clip_strategy} '
+                 f'noise multiplier {dp_params.sigma}'
+                 f' clip value {args.clip_value}')
+
     embedder = SVDEmbedder(args.num_basis)
+
+    logger.debug(f'Created SVDEmbedder with {args.num_basis} basis elements')
+
+    public_inputs, public_targets = get_aux_data(aux_dataset=args.aux_dataset,
+                                                 aux_data_size=args.aux_data_size,
+                                                 real_labels=args.real_labels)
+
+    logger.debug(f'Created public data with {len(public_inputs)} examples')
+
+    pub_data_grads = PublicDataPerSampleGrad(public_data=(public_inputs, public_targets), net=net)
+
+    logger.debug(f'Created PublicDataPerSampleGrad')
 
     net = net.cuda()
     for epoch in range(args.num_epochs):
         train_loss, train_acc = train_epoch(net=net, loss_function=loss_function, optimizer=optimizer,
-                                            train_loader=train_loader, grads_processor=grads_processor)
+                                            train_loader=train_loader, grads_processor=grads_processor,
+                                            embedder=embedder, pub_data_grads=pub_data_grads)
         logger.info(
             f'Epoch {epoch}/{args.num_epochs} train loss {train_loss} train accuracy {train_acc}')
         test_loss, test_acc = eval_model(net=net, loss_function=loss_function, loader=test_loader)
         logger.info(f'Epoch {epoch}/{args.num_epochs} test loss {test_loss} test accuracy {test_acc}')
+
+
+def get_aux_data(aux_dataset: str, aux_data_size: int, real_labels: bool):
+    ## preparing auxiliary data
+    num_public_examples = aux_data_size
+    if ('cifar' in aux_dataset):
+        if (aux_dataset == 'cifar100'):
+            transform_test = torchvision.transforms.Compose([
+                torchvision.transforms.ToTensor(),
+                torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            ])
+            testset = torchvision.datasets.CIFAR100(root='./data', train=False, download=True, transform=transform_test)
+        public_data_loader = torch.utils.data.DataLoader(testset, batch_size=num_public_examples, shuffle=False,
+                                                         num_workers=2)  #
+        for public_inputs, public_targets in public_data_loader:
+            break
+    else:
+        public_inputs = torch.load(
+            './data/imagenet_examples_2000')[
+                        :num_public_examples]
+    if (not real_labels):
+        public_targets = torch.randint(high=10, size=(num_public_examples,))
+    return public_inputs, public_targets
 
 
 

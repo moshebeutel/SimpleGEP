@@ -4,7 +4,7 @@ from simplegep.embeddings.utils import normalize_return_transform
 
 
 class SVDEmbedder(Embedder):
-    def __init__(self, num_basis_elements):
+    def __init__(self, num_basis_elements: int):
         super(SVDEmbedder).__init__()
         self._num_basis_elements = num_basis_elements
         self._basis_elements = None
@@ -13,6 +13,8 @@ class SVDEmbedder(Embedder):
         self._V = None
         self._center = None
         self._scale = None
+
+
 
     def calc_embedding_space(self, data: torch.Tensor):
         normalized_x, self._center, self._scale = normalize_return_transform(data)

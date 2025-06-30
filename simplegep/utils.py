@@ -36,9 +36,12 @@ def parse_args(description: str):
     parser.add_argument('--eps', default=8., type=float, help='privacy parameter epsilon')
 
     ## arguments for GEP
-    parser.add_argument('--num_basis', default=100, type=int, help='total number of basis elements')
+    parser.add_argument('--num_basis', default=1000, type=int, help='total number of basis elements')
 
-
+    parser.add_argument('--real_labels', action='store_true', help='use real labels for auxiliary dataset')
+    parser.add_argument('--aux_dataset', default='imagenet', type=str,
+                        help='name of the public dataset, [cifar10, cifar100, imagenet]')
+    parser.add_argument('--aux_data_size', default=2000, type=int, help='size of the auxiliary dataset')
     args = parser.parse_args()
     return args
 

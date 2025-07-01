@@ -1,6 +1,6 @@
 from simplegep.utils import parse_args, set_logger
-# DP_METHOD = 'DP-SGD'
-DP_METHOD = 'GEP'
+DP_METHOD = 'DP-SGD'
+# DP_METHOD = 'GEP'
 if DP_METHOD == 'GEP':
     from simplegep.trainers.gep_trainer import train
 else:

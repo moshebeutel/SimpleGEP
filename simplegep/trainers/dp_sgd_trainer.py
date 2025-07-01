@@ -5,6 +5,7 @@ from tqdm import tqdm
 from simplegep.data.cifar_loader import get_train_loader, get_test_loader
 from simplegep.dp.dp_params import get_dp_params
 from simplegep.dp.dp_sgd import GradsProcessor
+from simplegep.dp.dynamic_dp import get_varying_sigma_values
 from simplegep.dp.per_sample_grad import pretrain_actions, backward_pass_get_batch_grads
 from simplegep.models.factory import get_model
 from simplegep.models.utils import initialize_weights, count_parameters
@@ -83,14 +84,25 @@ def train(args, logger: logging.Logger):
     logger.debug(f'DP params - '
                  f' sigma {dp_params.sigma}'
                  f' delta {dp_params.delta} '
-                 f' epsilon {dp_params.epsilon}')
+                 f' epsilon {dp_params.epsilon}'
+                 f' sampling prob {dp_params.sampling_prob} '
+                 f' steps {dp_params.steps} ')
+    args.dynamic_noise = True
+    if args.dynamic_noise:
+        sigma_list = get_varying_sigma_values(q=dp_params.sampling_prob,
+                                              n_epoch=args.num_epochs,
+                                              eps=args.eps, delta=dp_params.delta,
+                                              initial_sigma_factor=10.0, sigma_factor_decrease_factor=0.9)
+
+        logger.debug(f'Created varying sigma list with {len(sigma_list)} values')
 
     grads_processor = GradsProcessor(clip_strategy_name=args.clip_strategy,
-                                     noise_multiplier=dp_params.sigma,
+                                     noise_multiplier=sigma_list if args.dynamic_noise else dp_params.sigma,
                                      clip_value=args.clip_value)
 
+    num_epochs = min(args.num_epochs, len(sigma_list)) if args.dynamic_noise else args.num_epochs
     net = net.cuda()
-    for epoch in range(args.num_epochs):
+    for epoch in range(num_epochs):
         train_loss, train_acc = train_epoch(net=net, loss_function=loss_function, optimizer=optimizer,
                                             train_loader=train_loader, grads_processor=grads_processor)
         logger.info(

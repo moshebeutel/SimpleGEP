@@ -8,6 +8,9 @@ class DPParams:
     delta: float
     epsilon: float
     sigma: float
+    sampling_prob: float
+    steps: int
+
 
 
 def get_dp_params(batchsize: int, num_training_samples: int, num_epochs: int, epsilon: float) -> DPParams:
@@ -19,5 +22,7 @@ def get_dp_params(batchsize: int, num_training_samples: int, num_epochs: int, ep
     return DPParams(
         delta=delta,
         epsilon=eps,
-        sigma=sigma
+        sigma=sigma,
+        sampling_prob=sampling_prob,
+        steps=steps
     )

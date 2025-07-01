@@ -20,16 +20,17 @@ def parse_args(description: str):
     parser.add_argument('--sess', default='resnet20_cifar10', type=str, help='session name')
     parser.add_argument('--model_name', default='resnet20', type=str, help='model name')
     parser.add_argument('--loss_function', default='cross_entropy', type=str, help='loss function name')
-    parser.add_argument('--optimizer', default='sgd', type=str, help='optimizer name')
+    parser.add_argument('--optimizer', default='adam', type=str, help='optimizer name')
     parser.add_argument('--seed', default=2, type=int, help='random seed')
     parser.add_argument('--weight_decay', default=0., type=float, help='weight decay')
     parser.add_argument('--batchsize', default=256, type=int, help='batch size')
-    parser.add_argument('--num_epochs', default=10, type=int, help='total number of epochs')
-    parser.add_argument('--lr', default=0.01, type=float, help='base learning rate (default=0.1)')
+    parser.add_argument('--num_epochs', default=30, type=int, help='total number of epochs')
+    parser.add_argument('--lr', default=0.001, type=float, help='base learning rate (default=0.1)')
     parser.add_argument('--momentum', default=0.9, type=float, help='value of momentum')
 
     ## arguments for learning with differential privacy
     parser.add_argument('--private', '-p', action='store_true', help='enable differential privacy')
+    parser.add_argument('--dynamic_noise', action='store_true', help='varying noise levels for each epoch')
     parser.add_argument('--clip_strategy', default='median', type=str,
                         help='clip strategy name: value, median, max')
     parser.add_argument('--clip_value', default=5., type=float, help='gradient clipping bound')

@@ -1,7 +1,7 @@
 from simplegep.utils import parse_args, set_logger
 
 def main(args):
-    logger = set_logger(logger_name=args.sess, log_dir='log', level='DEBUG')
+    logger = set_logger(logger_name=args.sess, log_dir=args.log_directory, level=args.log_level)
     logger.info(f'Logger is set - session: {args.sess}')
     logger.info(f'Arguments: {args}')
     train(args, logger)

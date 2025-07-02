@@ -12,10 +12,13 @@ from tqdm import tqdm
 
 def parse_args(description: str):
     parser = argparse.ArgumentParser(description=description)
-
+    project_dir = Path(__file__).resolve().parent
     ## general arguments
     parser.add_argument('--dataset', default='cifar10', type=str, help='dataset name')
-    parser.add_argument('--data_root', default='data', type=str, help='dataset name')
+    parser.add_argument('--data_root', default= project_dir / 'data', type=str, help='dataset directory')
+    parser.add_argument('--log_root', default= project_dir / 'log', type=str, help='log directory')
+    parser.add_argument('--log_level', default= 'DEBUG', type=str, choices=['DEBUG', 'INFO'],
+                        help='log level: DEBUG, INFO Default: DEBUG.')
     parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
     parser.add_argument('--sess', default='resnet20_cifar10', type=str, help='session name')
     parser.add_argument('--model_name', default='tiny_cifar_net_4', type=str, help='model name')

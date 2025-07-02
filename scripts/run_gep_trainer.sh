@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+# Get the directory where the script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Change to the simplegep directory
+cd "$SCRIPT_DIR" || exit
+cd ../simplegep || exit
+
+echo 'Run GEP trainer'
+poetry run python main.py -p --dp_method gep
+echo 'GEP trainer finished'

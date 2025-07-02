@@ -18,7 +18,7 @@ def parse_args(description: str):
     parser.add_argument('--data_root', default='data', type=str, help='dataset name')
     parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
     parser.add_argument('--sess', default='resnet20_cifar10', type=str, help='session name')
-    parser.add_argument('--model_name', default='resnet20', type=str, help='model name')
+    parser.add_argument('--model_name', default='tiny_cifar_net_4', type=str, help='model name')
     parser.add_argument('--loss_function', default='cross_entropy', type=str, help='loss function name')
     parser.add_argument('--optimizer', default='adam', type=str, help='optimizer name')
     parser.add_argument('--seed', default=2, type=int, help='random seed')
@@ -29,9 +29,11 @@ def parse_args(description: str):
     parser.add_argument('--momentum', default=0.9, type=float, help='value of momentum')
 
     ## arguments for learning with differential privacy
+    parser.add_argument('--dp_method', default="dp_sgd", choices=['dp_sgd', 'gep'],
+                        help='Differential privacy method: dp_sgd, gep. Default: dp_sgd.')
     parser.add_argument('--private', '-p', action='store_true', help='enable differential privacy')
     parser.add_argument('--dynamic_noise', action='store_true', help='varying noise levels for each epoch')
-    parser.add_argument('--clip_strategy', default='median', type=str,
+    parser.add_argument('--clip_strategy', default='median', type=str, choices=['value', 'median', 'max'],
                         help='clip strategy name: value, median, max')
     parser.add_argument('--clip_value', default=5., type=float, help='gradient clipping bound')
     parser.add_argument('--eps', default=8., type=float, help='privacy parameter epsilon')
@@ -43,6 +45,8 @@ def parse_args(description: str):
     parser.add_argument('--aux_dataset', default='imagenet', type=str,
                         help='name of the public dataset, [cifar10, cifar100, imagenet]')
     parser.add_argument('--aux_data_size', default=2000, type=int, help='size of the auxiliary dataset')
+    parser.add_argument('--wandb', type=bool, default=True, help='enable wandb')
+
     args = parser.parse_args()
     return args
 

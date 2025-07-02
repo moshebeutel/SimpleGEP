@@ -116,6 +116,7 @@ def train(args, logger: logging.Logger):
 
     net = net.cuda()
     for epoch in range(args.num_epochs):
+        logger.info(f'***** Starting epoch {epoch}  ******')
         train_loss, train_acc = train_epoch(net=net, loss_function=loss_function, optimizer=optimizer,
                                             train_loader=train_loader, grads_processor=grads_processor,
                                             embedder=embedder, pub_data_grads=pub_data_grads)

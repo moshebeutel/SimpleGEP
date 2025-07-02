@@ -12,7 +12,7 @@ from simplegep.models.utils import initialize_weights, count_parameters
 from simplegep.trainers.loss_function_factory import get_loss_function
 from simplegep.trainers.optimizer_factory import get_optimizer
 from simplegep.utils import eval_model
-
+import wandb
 
 def train_epoch(net, loss_function, optimizer, train_loader, grads_processor):
     train_loss, train_acc = 0.0, 0.0
@@ -48,8 +48,10 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor):
 
 def train(args, logger: logging.Logger):
     logger.info('Starting training')
+    if args.wandb:
+        wandb.init(project='GEP', name=args.sess)
 
-    net = get_model(args.model_name)
+    net = get_model(args)
     initialize_weights(net)
     num_params, layer_sizes = count_parameters(model=net, return_layer_sizes=True)
     logger.debug(f'Model set to {args.model_name} num params {num_params}')
@@ -87,7 +89,7 @@ def train(args, logger: logging.Logger):
                  f' epsilon {dp_params.epsilon}'
                  f' sampling prob {dp_params.sampling_prob} '
                  f' steps {dp_params.steps} ')
-    args.dynamic_noise = True
+
     if args.dynamic_noise:
         sigma_list = get_varying_sigma_values(q=dp_params.sampling_prob,
                                               n_epoch=args.num_epochs,
@@ -103,12 +105,16 @@ def train(args, logger: logging.Logger):
     num_epochs = min(args.num_epochs, len(sigma_list)) if args.dynamic_noise else args.num_epochs
     net = net.cuda()
     for epoch in range(num_epochs):
+        logger.info(f'***** Starting epoch {epoch}  ******')
         train_loss, train_acc = train_epoch(net=net, loss_function=loss_function, optimizer=optimizer,
                                             train_loader=train_loader, grads_processor=grads_processor)
         logger.info(
             f'Epoch {epoch}/{args.num_epochs} train loss {train_loss} train accuracy {train_acc}')
         test_loss, test_acc = eval_model(net=net, loss_function=loss_function, loader=test_loader)
         logger.info(f'Epoch {epoch}/{args.num_epochs} test loss {test_loss} test accuracy {test_acc}')
+        if args.wandb:
+            wandb.log({'train_loss': train_loss, 'train_acc': train_acc, 'test_loss': test_loss, 'test_acc': test_acc})
+
 
 
 

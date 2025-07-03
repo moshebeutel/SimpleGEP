@@ -7,6 +7,9 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR" || exit
 cd ../simplegep || exit
 
+echo "Current Working Directory"
+pwd
+
 echo 'Run GEP trainer'
 poetry run python main.py -p --dp_method gep
 echo 'GEP trainer finished'

@@ -7,7 +7,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR" || exit
 cd ../simplegep || exit
 
-echo "Current Woking Directory"
+echo "Current Working Directory"
 pwd
 
 echo 'Run DP-SGD trainer'

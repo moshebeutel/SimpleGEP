@@ -122,25 +122,40 @@ def set_logger(logger_name: str, log_dir: str, level=logging.INFO) -> logging.Lo
 @torch.no_grad()
 def eval_model(net, loss_function, loader):
     net.eval()
-    test_loss, test_acc = 0.0, 0.0
-    pbar = tqdm(enumerate(loader), total=len(loader))
+    test_loss = 0
+    correct = 0
+    total = 0
+    all_correct = []
+    with torch.no_grad():
+        pbar = tqdm(enumerate(loader), total=len(loader))
+        for batch_idx, (inputs, targets) in pbar:
 
-    for batch_idx, (data, target) in enumerate(loader):
-        data, target = data.cuda(), target.cuda()
-        output = net(data)
-        loss = loss_function(output, target)
-        correct_predictions = torch.eq(output.argmax(dim=1), target)
-        batch_acc = correct_predictions.sum().item() / len(correct_predictions)
-        test_acc += batch_acc
-        test_loss += loss.item()
-        pbar.set_description(f'Batch {batch_idx}/{len(loader)} train loss {loss.item()} train accuracy {batch_acc}')
+            inputs, targets = inputs.cuda(), targets.cuda()
+            outputs = net(inputs)
+            loss = loss_function(outputs, targets)
+            step_loss = loss.item()
 
-        data, target, output, loss, correct_predictions = (data.detach().cpu(), target.detach().cpu(),
-                                                           output.detach().cpu(), loss.detach().cpu(),
-                                                           correct_predictions.detach().cpu())
-        data, target, output, loss, correct_predictions = None, None, None, None, None
-        del data, target, output, loss, correct_predictions
-        gc.collect()
-        torch.cuda.empty_cache()
+            step_loss /= inputs.shape[0]
+
+            test_loss += step_loss
+            _, predicted = torch.max(outputs.data, 1)
+            total += targets.size(0)
+            correct_idx = predicted.eq(targets.data).cpu()
+            all_correct += correct_idx.numpy().tolist()
+            correct += correct_idx.sum()
+            batch_acc = correct_idx.sum() / targets.size(0)
+
+            pbar.set_description(f'Batch {batch_idx}/{len(loader)} test batch loss {step_loss:.2f}'
+                                 f' test accuracy {batch_acc:.2f}')
+
+            inputs, targets, outputs, loss = (inputs.detach().cpu(), targets.detach().cpu(),
+                                                               outputs.detach().cpu(), loss.detach().cpu())
+            inputs, targets, outputs, loss = None, None, None, None
+            del inputs, targets, outputs, loss
+            gc.collect()
+            torch.cuda.empty_cache()
+
+        test_acc = 100.*float(correct)/float(total)
+        test_loss = test_loss / batch_idx
 
     return test_loss, test_acc

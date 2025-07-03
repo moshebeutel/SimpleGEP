@@ -14,35 +14,54 @@ from simplegep.trainers.optimizer_factory import get_optimizer
 from simplegep.utils import eval_model
 import wandb
 
+
 def train_epoch(net, loss_function, optimizer, train_loader, grads_processor):
     train_loss, train_acc = 0.0, 0.0
+    correct = 0
+    total = 0
+    all_correct = []
     net.train()
     pbar = tqdm(enumerate(train_loader), total=len(train_loader))
-    for batch_idx, (data, target) in pbar:
-        data, target = data.cuda(), target.cuda()
+    for batch_idx, (inputs, targets) in pbar:
+        inputs, targets = inputs.cuda(), targets.cuda()
         optimizer.zero_grad()
-        output = net(data)
-        loss = loss_function(output, target)
-        correct_predictions = torch.eq(output.argmax(dim=1), target)
-        batch_acc = correct_predictions.sum().item() / len(correct_predictions)
-        train_acc += batch_acc
-        train_loss += loss.item()
+        outputs = net(inputs)
+        loss = loss_function(outputs, targets)
+        step_loss = loss.item()
+
+        step_loss /= inputs.shape[0]
+
+        train_loss += step_loss
+        _, predicted = torch.max(outputs.data, 1)
+        total += targets.size(0)
+        correct_idx = predicted.eq(targets.data).cpu()
+        all_correct += correct_idx.numpy().tolist()
+        correct += correct_idx.sum()
+        batch_acc = correct_idx.sum() / targets.size(0)
+
         flat_per_sample_grads = backward_pass_get_batch_grads(batch_loss=loss, net=net)
         processed_grads = grads_processor.process_grads(flat_per_sample_grads)
         offset = 0
-        for param in net.parameters() :
+        for param in net.parameters():
             numel = param.numel()
-            grad = processed_grads[offset:offset+numel].reshape(param.shape)
+            grad = processed_grads[offset:offset + numel].reshape(param.shape)
             param.grad = grad.clone().reshape(param.shape)
             offset += numel
         optimizer.step()
-        pbar.set_description(f'Batch {batch_idx}/{len(train_loader)} train loss {loss.item()} train accuracy {batch_acc}')
 
-        data, target, output, loss, correct_predictions = data.detach().cpu(), target.detach().cpu(), output.detach().cpu(), loss.detach().cpu(), correct_predictions.detach().cpu()
-        data, target, output, loss, correct_predictions = None, None, None, None, None
-        del data, target, output, loss, correct_predictions
+        pbar.set_description(f'Batch {batch_idx}/{len(train_loader)} train batch loss {step_loss:.2f}'
+                             f' train accuracy {batch_acc:.2f}')
+
+        inputs, targets, outputs, loss = (inputs.detach().cpu(), targets.detach().cpu(),
+                                          outputs.detach().cpu(), loss.detach().cpu())
+        inputs, targets, outputs, loss = None, None, None, None
+        del inputs, targets, outputs, loss
         gc.collect()
         torch.cuda.empty_cache()
+
+    train_acc = 100. * float(correct) / float(total)
+    train_loss = train_loss / batch_idx
+
     return train_loss, train_acc
 
 
@@ -109,13 +128,8 @@ def train(args, logger: logging.Logger):
         train_loss, train_acc = train_epoch(net=net, loss_function=loss_function, optimizer=optimizer,
                                             train_loader=train_loader, grads_processor=grads_processor)
         logger.info(
-            f'Epoch {epoch}/{args.num_epochs} train loss {train_loss} train accuracy {train_acc}')
+            f'Epoch {epoch}/{args.num_epochs} train loss {train_loss:.2f} train accuracy {train_acc:.2f}')
         test_loss, test_acc = eval_model(net=net, loss_function=loss_function, loader=test_loader)
-        logger.info(f'Epoch {epoch}/{args.num_epochs} test loss {test_loss} test accuracy {test_acc}')
+        logger.info(f'Epoch {epoch}/{args.num_epochs} test loss {test_loss:.2f} test accuracy {test_acc:.2f}')
         if args.wandb:
             wandb.log({'train_loss': train_loss, 'train_acc': train_acc, 'test_loss': test_loss, 'test_acc': test_acc})
-
-
-
-
-

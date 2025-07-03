@@ -26,6 +26,7 @@ def init_sweep(config):
 def start_sweep(sweep_id, f_sweep):
     wandb.agent(sweep_id=sweep_id, function=f_sweep)
 
+
 def sweep(sweep_config, args, train_fn):
     sweep_id = init_sweep(sweep_config)
     f_sweep = partial(sweep_train, sweep_id=sweep_id, args=args, train_fn=train_fn)
@@ -38,19 +39,19 @@ def main(args):
     logger.info(f'Logger is set - session: {args.sess}')
     logger.info(f'Arguments: {args}')
 
-
     sweep_configuration = {
         "name": f"{args.dp_method.upper()}_SEED_{args.seed}_TINY",
         # "name": f"GEP_SEED_2_TINY_COMPARE",
         "method": "grid",
         "metric": {"goal": "maximize", "name": "test_acc"},
         "parameters": {
-            "lr": {"values": [1e-5]},
-            "seed": {"values": [2]},
+            "lr": {"values": [1e-4]},
+            "seed": {"values": [3]},
             "clip_value": {"values": [35.0, 10.0]},
             "clip_strategy": {"values": ["median", "max"]},
             "eps": {"values": [8.0]},
-            "momentum": {"values": [0.9, 0.99, 0.999]},
+            "optimizer": {"values": ["adam", "sgd"]},
+            "momentum": {"values": [0.9]},
             "filters": {"values": [4, 16]},
             "dynamic_noise": {"values": [False, True]},
             "num_epochs": {"values": [25]},
@@ -63,8 +64,7 @@ def main(args):
     # wandb.login()
 
     sweep(sweep_config=sweep_configuration, args=args,
-      train_fn=partial(train, logger=logger))
-
+          train_fn=partial(train, logger=logger))
 
 
 if __name__ == '__main__':

@@ -1,12 +1,7 @@
-import argparse
+import time
 from functools import partial
 import wandb
-
 from simplegep.utils import set_seed, parse_args, set_logger
-
-
-# from utils import set_seed
-# from main import main
 
 
 def sweep_train(sweep_id, args, train_fn, config=None):
@@ -31,13 +26,10 @@ def init_sweep(config):
 def start_sweep(sweep_id, f_sweep):
     wandb.agent(sweep_id=sweep_id, function=f_sweep)
 
-
 def sweep(sweep_config, args, train_fn):
-    # logger = logging.getLogger(args.log_name)
-    # logger.info(f'sweep {sweep_config}')
     sweep_id = init_sweep(sweep_config)
     f_sweep = partial(sweep_train, sweep_id=sweep_id, args=args, train_fn=train_fn)
-    wandb.agent(sweep_id=sweep_id, function=f_sweep)
+    # wandb.agent(sweep_id=sweep_id, function=f_sweep)
     start_sweep(sweep_id, f_sweep)
 
 
@@ -45,7 +37,7 @@ def main(args):
     logger = set_logger(logger_name=args.sess, log_dir='log', level='DEBUG')
     logger.info(f'Logger is set - session: {args.sess}')
     logger.info(f'Arguments: {args}')
-    train(args, logger)
+
 
     sweep_configuration = {
         "name": f"{args.dp_method.upper()}_SEED_{args.seed}_TINY",
@@ -56,7 +48,7 @@ def main(args):
             "lr": {"values": [1e-5]},
             "seed": {"values": [2]},
             "clip_value": {"values": [35.0, 10.0]},
-            "clip_strategy": {"values": ["value", "median", "max"]},
+            "clip_strategy": {"values": ["median", "max"]},
             "eps": {"values": [8.0]},
             "momentum": {"values": [0.9, 0.99, 0.999]},
             "filters": {"values": [4, 16]},
@@ -68,10 +60,11 @@ def main(args):
         }
     }
 
-    wandb.login()
+    # wandb.login()
 
     sweep(sweep_config=sweep_configuration, args=args,
       train_fn=partial(train, logger=logger))
+
 
 
 if __name__ == '__main__':

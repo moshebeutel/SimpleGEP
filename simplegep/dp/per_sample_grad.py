@@ -31,7 +31,7 @@ def backward_pass_get_batch_grads(batch_loss: torch.Tensor, net: torch.nn.Module
     return flat_grad_batch_tensor
 
 class PublicDataPerSampleGrad:
-    def __init__(self,  public_data: tuple[torch.Tensor,torch.Tensor]|DataLoader, net:nn.Module,public_batchsize: int = 256):
+    def __init__(self,  public_data, net:nn.Module,public_batchsize: int = 256):
         if isinstance(public_data, DataLoader):
             self._public_data_loader = public_data
         elif isinstance(public_data, tuple):

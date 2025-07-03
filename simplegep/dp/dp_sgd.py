@@ -12,7 +12,7 @@ def get_noise(sigma, batchsize, shape, device):
     return noise
 
 class GradsProcessor:
-    def __init__(self, clip_strategy_name: str, noise_multiplier: float| list, clip_value: float):
+    def __init__(self, clip_strategy_name: str, noise_multiplier, clip_value: float):
         self.clip_strategy_name = clip_strategy_name
         self.noise_multiplier_list = [noise_multiplier] if isinstance(noise_multiplier, float) else noise_multiplier
         self.clip_value = clip_value

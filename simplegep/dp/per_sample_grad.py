@@ -54,5 +54,5 @@ class PublicDataPerSampleGrad:
             batch_loss = self._net(batch).mean()
             grad_batch = backward_pass_get_batch_grads(batch_loss, self._net)
             grad_batch_list.append(grad_batch)
-        flat_grad_batch_tensor = flatten_tensor(grad_batch_list)
+        flat_grad_batch_tensor = torch.cat(grad_batch_list)
         return flat_grad_batch_tensor

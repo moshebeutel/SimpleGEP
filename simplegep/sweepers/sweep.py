@@ -47,17 +47,19 @@ def main(args):
         "parameters": {
             "lr": {"values": [1e-4]},
             "seed": {"values": [3]},
-            "clip_value": {"values": [35.0, 10.0]},
-            "clip_strategy": {"values": ["median", "max"]},
+            "clip_value": {"values": [35.0]},
+            "clip_strategy": {"values": ["median"]},
             "eps": {"values": [8.0]},
-            "optimizer": {"values": ["adam", "sgd"]},
+            "optimizer": {"values": ["adam"]},
             "momentum": {"values": [0.9]},
-            "filters": {"values": [4, 16]},
-            "dynamic_noise": {"values": [False, True]},
+            "filters": {"values": [4]},
+            "dynamic_noise": {"values": [True] },
+            "dynamic_noise_high_factor": {"values": [10.0, 5.0, 2.0]},
+            "dynamic_noise_low_factor": {"values": [0.75, 0.5, 0.1]},
             "num_epochs": {"values": [25]},
             # "num_bases": {"values": [1000]},
             "aux_data_size": {"values": [2000]},
-            "batchsize": {"values": [256, 512]}
+            "batchsize": {"values": [256]}
         }
     }
 

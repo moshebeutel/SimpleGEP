@@ -24,7 +24,7 @@ class GradsProcessor:
     def process_grads(self, grads: torch.Tensor) -> torch.Tensor:
         clipped_grads = self.clip_func(grads, self.clip_value)
         clipped_norm = torch.linalg.norm(clipped_grads, dim=1).max().item()
-        mean_grad = clipped_grads.mean(dim=0).squeeze()
+        mean_grad = clipped_grads.mean(dim=0, keepdim=True)
         sigma = self.get_noise_multiplier(self._epoch) * clipped_norm
         noise = get_noise(sigma, grads.shape[0], mean_grad.shape, grads.device)
         noised_grads = mean_grad + noise

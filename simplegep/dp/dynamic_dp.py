@@ -1,8 +1,6 @@
 import math
-
 import numpy as np
 from tqdm import trange
-
 from simplegep.dp.rdp_accountant import compute_rdp, get_privacy_spent, get_sigma
 
 
@@ -21,27 +19,45 @@ def privacy_budget_left(sampling_prob, steps, cur_sigma, delta, rdp_orders=32):
     # print(f"epsilon_bar: {epsilon_bar}")
     return float(cur_eps), epsilon_bar
 
-def get_varying_sigma_values(q, n_epoch, eps, delta, initial_sigma_factor, sigma_factor_decrease_factor):
-    accumulated_epsilon_bar = 0
-    sigma_factor = initial_sigma_factor
-    sigmas = []
-    pbar = trange(n_epoch)
-    for i in pbar:
-
-        steps_in_epoch = int(1 / q)
-        sigma, previous_eps = get_sigma(q=q, T=steps_in_epoch, eps=eps, delta=delta)
-        sigma *= sigma_factor
-        sigmas.append(sigma)
-        sigma_factor *= sigma_factor_decrease_factor
+def calc_privacy_spent_by_sigma(q, eps,delta, sigmas):
+    accumulated_epsilon_bar, accumulated_epsilon = 0.0, 0.0
+    accumulated_epsilon_bar_list, accumulated_epsilon_list = [], []
+    steps_in_epoch = int(1 / q)
+    pbar = trange(len(sigmas))
+    for sigma in sigmas:
         epsilon, epsilon_bar = privacy_budget_left(q, steps_in_epoch, sigma, delta)
         accumulated_epsilon_bar += epsilon_bar
         accumulated_epsilon = get_epsilon_from_epsilon_bar(accumulated_epsilon_bar, 32, delta)
-        pbar.set_description(f"accumulated epsilon: {accumulated_epsilon} accumulated epsilon bar: {accumulated_epsilon_bar}")
+        pbar.set_description(
+            f"accumulated epsilon: {accumulated_epsilon} accumulated epsilon bar: {accumulated_epsilon_bar}")
         if accumulated_epsilon > eps:
-            sigmas = sigmas[:-1]
             break
+        accumulated_epsilon_list.append(float(accumulated_epsilon))
+        accumulated_epsilon_bar_list.append(float(accumulated_epsilon_bar))
 
-    return sigmas
+    return accumulated_epsilon_list, accumulated_epsilon_bar_list
+
+def linear_decrease(upper_bound, lower_bound, num_values):
+    diff = (upper_bound - lower_bound) / num_values
+    return [upper_bound - diff * i for i in range(num_values)]
+
+def geometric_decrease(upper_bound, lower_bound, num_values):
+    factor = (lower_bound / upper_bound) ** (1 / num_values)
+    return [upper_bound * factor ** i for i in range(num_values)]
+
+def get_varying_sigma_values(q, n_epoch, eps, delta, initial_sigma_factor, final_sigma_factor, decrease_linearly=True):
+    assert initial_sigma_factor > final_sigma_factor, "Initial sigma factor must be greater than final sigma factor"
+    assert final_sigma_factor > 0, "Final sigma factor must be greater than 0"
+    decrease_func = linear_decrease if decrease_linearly else geometric_decrease
+    steps_in_epoch = int(1 / q)
+    sigma_orig, previous_eps = get_sigma(q=q, T=steps_in_epoch*n_epoch, eps=eps, delta=delta)
+    decrease_factors = decrease_func(initial_sigma_factor, final_sigma_factor, n_epoch)
+    sigmas = [sigma_orig * sigma_factor for sigma_factor in decrease_factors]
+    accumulated_epsilon_list, accumulated_epsilon_bar_list = calc_privacy_spent_by_sigma(q, eps,delta, sigmas)
+    num_epochs_to_reach_eps = len(accumulated_epsilon_list)
+    return sigmas[:num_epochs_to_reach_eps], accumulated_epsilon_list, accumulated_epsilon_bar_list, sigma_orig
+
+
 
 if __name__ == "__main__":
     batchsize = 128
@@ -49,12 +65,45 @@ if __name__ == "__main__":
     n_epoch = 25
     delta = 1 / n_epoch
     epsilon = 8
+    initial_sigma_factor = 1.1
+    final_sigma_factor = 0.85
     sampling_prob = batchsize / n_training
     steps = int(n_epoch / sampling_prob)
-    sigmas = get_varying_sigma_values(sampling_prob, n_epoch, epsilon, delta,
-                                      10.0, 0.89)
+
+
+    sigmas, accumulated_epsilon, accumulated_epsilon_bar, sigma_orig = get_varying_sigma_values(sampling_prob, n_epoch, epsilon, delta,
+                                                                                                initial_sigma_factor=1.1,
+                                                                                                final_sigma_factor= 1.1-0.25,
+                                                                                                decrease_linearly=True)
 
     print(sigmas)
     print(f"Number of sigmas: {len(sigmas)}")
     print(f'First sigma: {sigmas[0]}')
     print(f"Final sigma: {sigmas[-1]}")
+    print(f'original sigma: {sigma_orig}')
+    sigmas_above_orig = np.array(sigmas) > sigma_orig
+    print(f"Number of sigmas above original sigma: {sum(sigmas_above_orig)}")
+    print(f"Accumulated epsilons: {accumulated_epsilon}")
+    print(f"Accumulated epsilon-bars: {accumulated_epsilon_bar}")
+
+    sigmas, accumulated_epsilon, accumulated_epsilon_bar, sigma_orig = get_varying_sigma_values(sampling_prob, n_epoch,
+                                                                                                epsilon, delta,
+                                                                                                initial_sigma_factor=1.1,
+                                                                                                final_sigma_factor=1.1 - 0.25,
+                                                                                                decrease_linearly=False)
+
+    print(sigmas)
+    print(f"Number of sigmas: {len(sigmas)}")
+    print(f'First sigma: {sigmas[0]}')
+    print(f"Final sigma: {sigmas[-1]}")
+    print(f'original sigma: {sigma_orig}')
+    sigmas_above_orig = np.array(sigmas) > sigma_orig
+    print(f"Number of sigmas above original sigma: {sum(sigmas_above_orig)}")
+    print(f"Accumulated epsilons: {accumulated_epsilon}")
+    print(f"Accumulated epsilon-bars: {accumulated_epsilon_bar}")
+
+
+
+
+
+

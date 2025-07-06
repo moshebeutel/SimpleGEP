@@ -25,12 +25,12 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor):
     for batch_idx, (inputs, targets) in pbar:
         inputs, targets = inputs.cuda(), targets.cuda()
         optimizer.zero_grad()
+
+        # forward pass
         outputs = net(inputs)
         loss = loss_function(outputs, targets)
         step_loss = loss.item()
-
         step_loss /= inputs.shape[0]
-
         train_loss += step_loss
         _, predicted = torch.max(outputs.data, 1)
         total += targets.size(0)
@@ -39,19 +39,27 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor):
         correct += correct_idx.sum()
         batch_acc = correct_idx.sum() / targets.size(0)
 
+        # get per sample grads
         flat_per_sample_grads = backward_pass_get_batch_grads(batch_loss=loss, net=net)
+
+        # perturb grads
         processed_grads = grads_processor.process_grads(flat_per_sample_grads)
+
+        # substitute perturbed grads
         offset = 0
         for param in net.parameters():
             numel = param.numel()
             grad = processed_grads[offset:offset + numel].reshape(param.shape)
             param.grad = grad.clone().reshape(param.shape)
             offset += numel
+
+        # update net parameters
         optimizer.step()
 
         pbar.set_description(f'Batch {batch_idx}/{len(train_loader)} train batch loss {step_loss:.2f}'
                              f' train accuracy {batch_acc:.2f}')
 
+        # free gpu memory
         inputs, targets, outputs, loss = (inputs.detach().cpu(), targets.detach().cpu(),
                                           outputs.detach().cpu(), loss.detach().cpu())
         inputs, targets, outputs, loss = None, None, None, None
@@ -109,17 +117,28 @@ def train(args, logger: logging.Logger):
                  f' sampling prob {dp_params.sampling_prob} '
                  f' steps {dp_params.steps} ')
 
+    sigma_list = [dp_params.sigma] * args.num_epochs
     if args.dynamic_noise:
-        sigma_list = get_varying_sigma_values(q=dp_params.sampling_prob,
+        sigma_list, accumulated_epsilon_list, accumulated_epsilon_bar_list, sigma_orig = (
+            get_varying_sigma_values(q=dp_params.sampling_prob,
                                               n_epoch=args.num_epochs,
                                               eps=args.eps, delta=dp_params.delta,
-                                              initial_sigma_factor=10.0, sigma_factor_decrease_factor=0.9)
+                                              initial_sigma_factor=args.dynamic_noise_high_factor,
+                                              final_sigma_factor=args.dynamic_noise_low_factor))
 
-        logger.debug(f'Created varying sigma list with {len(sigma_list)} values')
+        logger.info(f'Created varying sigma list with {len(sigma_list)} values')
+        logger.debug(f'Sigma list: {sigma_list}')
+        logger.debug(f'Accumulated epsilon list: {accumulated_epsilon_list}')
+        logger.debug(f'Accumulated epsilon bar list: {accumulated_epsilon_bar_list}')
+        logger.debug(f'Sigma orig: {sigma_orig}')
 
     grads_processor = GradsProcessor(clip_strategy_name=args.clip_strategy,
-                                     noise_multiplier=sigma_list if args.dynamic_noise else dp_params.sigma,
+                                     noise_multiplier=sigma_list,
                                      clip_value=args.clip_value)
+
+    logger.debug(f'Created GradsProcessor with strategy {args.clip_strategy} '
+                 f'noise multiplier {dp_params.sigma}'
+                 f' clip value {args.clip_value}')
 
     num_epochs = min(args.num_epochs, len(sigma_list)) if args.dynamic_noise else args.num_epochs
     net = net.cuda()
@@ -127,9 +146,12 @@ def train(args, logger: logging.Logger):
         logger.info(f'***** Starting epoch {epoch}  ******')
         train_loss, train_acc = train_epoch(net=net, loss_function=loss_function, optimizer=optimizer,
                                             train_loader=train_loader, grads_processor=grads_processor)
-        logger.info(
-            f'Epoch {epoch}/{args.num_epochs} train loss {train_loss:.2f} train accuracy {train_acc:.2f}')
+        logger.info(f'Epoch {epoch}/{args.num_epochs} train loss {train_loss:.2f} train accuracy {train_acc:.2f}')
         test_loss, test_acc = eval_model(net=net, loss_function=loss_function, loader=test_loader)
         logger.info(f'Epoch {epoch}/{args.num_epochs} test loss {test_loss:.2f} test accuracy {test_acc:.2f}')
         if args.wandb:
-            wandb.log({'train_loss': train_loss, 'train_acc': train_acc, 'test_loss': test_loss, 'test_acc': test_acc})
+            wandb.log({'train_loss': train_loss, 'train_acc': train_acc, 'test_loss': test_loss,
+                       'test_acc': test_acc, 'sigma': sigma_list[epoch]}, step=epoch)
+            if args.dynamic_noise:
+                wandb.log({'accumulated_epsilon': accumulated_epsilon_list[epoch],
+                       'accumulated_epsilon_bar': accumulated_epsilon_bar_list[epoch]}, step=epoch)

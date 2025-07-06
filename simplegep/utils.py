@@ -36,6 +36,9 @@ def parse_args(description: str):
                         help='Differential privacy method: dp_sgd, gep. Default: dp_sgd.')
     parser.add_argument('--private', '-p', action='store_true', help='enable differential privacy')
     parser.add_argument('--dynamic_noise', action='store_true', help='varying noise levels for each epoch')
+    parser.add_argument('--dynamic_noise_high_factor', default=10., type=float, help='highest noise factor for varying mechanism')
+    parser.add_argument('--dynamic_noise_low_factor', default=0.1, type=float, help='lowest noise factor for varying mechanism')
+
     parser.add_argument('--clip_strategy', default='median', type=str, choices=['value', 'median', 'max'],
                         help='clip strategy name: value, median, max')
     parser.add_argument('--clip_value', default=5., type=float, help='gradient clipping bound')

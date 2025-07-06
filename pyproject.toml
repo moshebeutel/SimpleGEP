@@ -14,6 +14,7 @@ wandb = "^0.17.4"
 backpack-for-pytorch = "^1.7.1"
 six = "^1.17.0"
 scipy = "^1.16.0"
+scikit-learn = "^1.7.0"
 
 
 [build-system]

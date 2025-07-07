@@ -45,10 +45,36 @@ def geometric_decrease(upper_bound, lower_bound, num_values):
     factor = (lower_bound / upper_bound) ** (1 / num_values)
     return [upper_bound * factor ** i for i in range(num_values)]
 
-def get_varying_sigma_values(q, n_epoch, eps, delta, initial_sigma_factor, final_sigma_factor, decrease_linearly=True):
+
+def logarithmic_decrease(upper_bound, lower_bound, num_values):
+    # Convex functions
+    funcs = {
+        r"$x^2$": lambda x: x ** 2,
+        r"$x^3$": lambda x: x ** 3,
+        r"$e^x$ (normalized)": lambda x: (np.exp(x) - 1) / (np.e - 1)
+    }
+
+    def convex_subdivision(a, b, n, func):
+        t = np.linspace(0, 1, n)
+        return a - (a - b) * func(t)
+
+
+    # return convex_subdivision(upper_bound, lower_bound, num_values, func=funcs[r"$x^2$"])
+    return convex_subdivision(upper_bound, lower_bound, num_values, func=funcs[r"$x^3$"])
+    # return convex_subdivision(upper_bound, lower_bound, num_values, func=funcs[r"$e^x$ (normalized)"])
+
+
+def get_decrease_function(args):
+    get_decrease_function.hub = {'linear': linear_decrease, 'geometric': geometric_decrease, 'logarithmic': logarithmic_decrease}
+    assert args.decrease_shape in ['linear', 'geometric', 'logarithmic'], (f"Unknown decrease shape {args.decrease_shape}."
+                                                                           f" Expected one of 'linear', 'geometric', 'logarithmic'.")
+    return get_decrease_function.hub[args.decrease_shape]
+
+
+def get_varying_sigma_values(q, n_epoch, eps, delta, initial_sigma_factor, final_sigma_factor, decrease_func):
     assert initial_sigma_factor > final_sigma_factor, "Initial sigma factor must be greater than final sigma factor"
     assert final_sigma_factor > 0, "Final sigma factor must be greater than 0"
-    decrease_func = linear_decrease if decrease_linearly else geometric_decrease
+
     steps_in_epoch = int(1 / q)
     sigma_orig, previous_eps = get_sigma(q=q, T=steps_in_epoch*n_epoch, eps=eps, delta=delta)
     decrease_factors = decrease_func(initial_sigma_factor, final_sigma_factor, n_epoch)
@@ -60,50 +86,47 @@ def get_varying_sigma_values(q, n_epoch, eps, delta, initial_sigma_factor, final
 
 
 if __name__ == "__main__":
-    batchsize = 128
+    import matplotlib.pyplot as plt
+    batchsize = 256
     n_training = 50000
     n_epoch = 25
     delta = 1 / n_epoch
-    epsilon = 8
-    initial_sigma_factor = 1.1
-    final_sigma_factor = 0.85
+    epsilon = 1
+    initial_sigma_factor = 3.2
+    final_sigma_factor = 0.4
     sampling_prob = batchsize / n_training
     steps = int(n_epoch / sampling_prob)
 
 
-    sigmas, accumulated_epsilon, accumulated_epsilon_bar, sigma_orig = get_varying_sigma_values(sampling_prob, n_epoch, epsilon, delta,
-                                                                                                initial_sigma_factor=1.1,
-                                                                                                final_sigma_factor= 1.1-0.25,
-                                                                                                decrease_linearly=True)
+    # Plot
+    plt.figure(figsize=(10, 6))
 
-    print(sigmas)
-    print(f"Number of sigmas: {len(sigmas)}")
-    print(f'First sigma: {sigmas[0]}')
-    print(f"Final sigma: {sigmas[-1]}")
-    print(f'original sigma: {sigma_orig}')
-    sigmas_above_orig = np.array(sigmas) > sigma_orig
-    print(f"Number of sigmas above original sigma: {sum(sigmas_above_orig)}")
-    print(f"Accumulated epsilons: {accumulated_epsilon}")
-    print(f"Accumulated epsilon-bars: {accumulated_epsilon_bar}")
+    for decrease_function in [linear_decrease, geometric_decrease, logarithmic_decrease]:
+    # for decrease_function in [concave_decrease]:
+        sigmas, accumulated_epsilon, accumulated_epsilon_bar, sigma_orig = get_varying_sigma_values(sampling_prob, n_epoch, epsilon, delta,
+                                                                                                initial_sigma_factor=initial_sigma_factor,
+                                                                                                final_sigma_factor=final_sigma_factor,
+                                                                                                decrease_func=decrease_function)
+        print(f"Decrease Function {decrease_function.__name__}")
+        print('**************************************************')
+        print(f"Number of sigmas: {len(sigmas)}")
+        print(f'First sigma: {sigmas[0]}')
+        print(f"Final sigma: {sigmas[-1]}")
+        print(f'original sigma: {sigma_orig}')
+        sigmas_above_orig = np.array(sigmas) > sigma_orig
+        print(f"Number of sigmas above original sigma: {sum(sigmas_above_orig)}")
+        print(f"Accumulated epsilons: {accumulated_epsilon}")
+        print(f"Accumulated epsilon-bars: {accumulated_epsilon_bar}")
 
-    sigmas, accumulated_epsilon, accumulated_epsilon_bar, sigma_orig = get_varying_sigma_values(sampling_prob, n_epoch,
-                                                                                                epsilon, delta,
-                                                                                                initial_sigma_factor=1.1,
-                                                                                                final_sigma_factor=1.1 - 0.25,
-                                                                                                decrease_linearly=False)
-
-    print(sigmas)
-    print(f"Number of sigmas: {len(sigmas)}")
-    print(f'First sigma: {sigmas[0]}')
-    print(f"Final sigma: {sigmas[-1]}")
-    print(f'original sigma: {sigma_orig}')
-    sigmas_above_orig = np.array(sigmas) > sigma_orig
-    print(f"Number of sigmas above original sigma: {sum(sigmas_above_orig)}")
-    print(f"Accumulated epsilons: {accumulated_epsilon}")
-    print(f"Accumulated epsilon-bars: {accumulated_epsilon_bar}")
+        plt.plot(range(len(sigmas)), sigmas, label=decrease_function.__name__)
 
 
 
-
-
+    plt.title(f"Sigma factor decrease from {initial_sigma_factor} to {final_sigma_factor}")
+    plt.xlabel("Subdivision index")
+    plt.ylabel("Value")
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
 

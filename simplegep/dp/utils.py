@@ -1,5 +1,27 @@
+from typing import Tuple
+
 import torch
 
+def cosine_similarity(a: torch.Tensor, b: torch.Tensor) -> Tuple[float, float]:
+    a = a.mean(0, keepdim=False)
+    b = b.mean(0, keepdim=False)
+    cosine = torch.dot(a, b) / (torch.norm(a) * torch.norm(b))
+    angle_rad = torch.acos(cosine)
+    angle_deg = float(angle_rad * 180 / torch.pi)
+    return float(cosine), angle_deg
+
+
+def check_approx_error(L: torch.Tensor, target: torch.Tensor, return_cosine=False) -> float or Tuple[float, float, float]:
+    encode = torch.matmul(target, L)  # n x k
+    decode = torch.matmul(encode, L.T)
+    error = float(torch.sum(torch.square(target - decode)))
+    target_sum_squares = float(torch.sum(torch.square(target)))
+    assert target_sum_squares > 0, f'Expected positive target_sum_squares. Got {target_sum_squares}'
+    if return_cosine:
+        cosine, angle_deg = cosine_similarity(target, decode)
+        return error / target_sum_squares, cosine, angle_deg
+
+    return error / target_sum_squares
 
 def flatten_tensor(tensor_list: list[ torch.Tensor]) -> torch.Tensor:
     for i in range(len(tensor_list)):

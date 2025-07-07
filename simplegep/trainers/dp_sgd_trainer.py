@@ -5,7 +5,7 @@ from tqdm import tqdm
 from simplegep.data.cifar_loader import get_train_loader, get_test_loader
 from simplegep.dp.dp_params import get_dp_params
 from simplegep.dp.dp_sgd import GradsProcessor
-from simplegep.dp.dynamic_dp import get_varying_sigma_values
+from simplegep.dp.dynamic_dp import get_varying_sigma_values, get_decrease_function
 from simplegep.dp.per_sample_grad import pretrain_actions, backward_pass_get_batch_grads
 from simplegep.models.factory import get_model
 from simplegep.models.utils import initialize_weights, count_parameters
@@ -46,6 +46,7 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor):
         processed_grads = grads_processor.process_grads(flat_per_sample_grads)
 
         # substitute perturbed grads
+        processed_grads = processed_grads.squeeze()
         offset = 0
         for param in net.parameters():
             numel = param.numel()
@@ -84,14 +85,15 @@ def train(args, logger: logging.Logger):
     logger.debug(f'Model set to {args.model_name} num params {num_params}')
     logger.debug(f'layer sizes: {layer_sizes}')
 
-    reduction = 'sum' if args.private else 'mean'
+    # reduction = 'sum' if args.private else 'mean'
+    reduction = 'sum'
     loss_function = get_loss_function(args.loss_function, reduction=reduction)
     logger.debug(f'loss function set to {args.loss_function} reduction {reduction}')
 
     net, loss_function = pretrain_actions(model=net, loss_func=loss_function)
     logger.debug('model and loss functions prepared for per sample grads')
 
-    optimizer = get_optimizer(optimizer_name=args.optimizer, model=net, lr=args.lr)
+    optimizer = get_optimizer(args=args, model=net)
     logger.debug(f'optimizer set to {args.optimizer} lr {args.lr}')
 
     train_loader = get_train_loader(root=args.data_root, batchsize=args.batchsize)
@@ -119,12 +121,15 @@ def train(args, logger: logging.Logger):
 
     sigma_list = [dp_params.sigma] * args.num_epochs
     if args.dynamic_noise:
+        sigma_decrease_function = get_decrease_function(args)
+        logger.debug(f'Using decrease function {sigma_decrease_function.__name__}')
         sigma_list, accumulated_epsilon_list, accumulated_epsilon_bar_list, sigma_orig = (
             get_varying_sigma_values(q=dp_params.sampling_prob,
                                               n_epoch=args.num_epochs,
                                               eps=args.eps, delta=dp_params.delta,
                                               initial_sigma_factor=args.dynamic_noise_high_factor,
-                                              final_sigma_factor=args.dynamic_noise_low_factor))
+                                              final_sigma_factor=args.dynamic_noise_low_factor,
+                                     decrease_func=sigma_decrease_function,))
 
         logger.info(f'Created varying sigma list with {len(sigma_list)} values')
         logger.debug(f'Sigma list: {sigma_list}')

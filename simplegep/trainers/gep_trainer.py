@@ -5,14 +5,14 @@ import torch
 import torchvision
 import wandb
 from tqdm import tqdm
+import simplegep.embeddings.factory
+from simplegep import embeddings
 from simplegep.data.cifar_loader import get_train_loader, get_test_loader
 from simplegep.dp.dp_params import get_dp_params
 from simplegep.dp.dp_sgd import GradsProcessor
-from simplegep.dp.dynamic_dp import get_varying_sigma_values
+from simplegep.dp.dynamic_dp import get_varying_sigma_values, get_decrease_function
 from simplegep.dp.per_sample_grad import pretrain_actions, backward_pass_get_batch_grads, PublicDataPerSampleGrad
 from simplegep.embeddings.embedder import Embedder
-from simplegep.embeddings.kernel_pca_embedder import KernelPCAEmbedder
-from simplegep.embeddings.svd_embedder import SVDEmbedder
 from simplegep.models.factory import get_model
 from simplegep.models.utils import initialize_weights, count_parameters
 from simplegep.trainers.loss_function_factory import get_loss_function
@@ -51,14 +51,16 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor, em
 
         # perturb grads in lower dimension subspace
         embedded_grads = embedder.embed(flat_per_sample_grads)
-        processed_grads = grads_processor.process_grads(embedded_grads)
-        reconstructed_grads = embedder.project_back(processed_grads).squeeze()
+        processed_embeddings = grads_processor.process_grads(embedded_grads)
+        reconstructed_grads = embedder.project_back(processed_embeddings)
+
 
         # substitute perturbed grads
+        processed_grads = reconstructed_grads.squeeze()
         offset = 0
         for param in net.parameters() :
             numel = param.numel()
-            grad = reconstructed_grads[offset:offset+numel].reshape(param.shape).to(param.device)
+            grad = processed_grads[offset:offset+numel].reshape(param.shape).to(param.device)
             param.grad = grad.clone().reshape(param.shape)
             offset += numel
 
@@ -90,14 +92,15 @@ def train(args, logger: logging.Logger):
     logger.debug(f'Model set to {args.model_name} num params {num_params}')
     logger.debug(f'layer sizes: {layer_sizes}')
 
-    reduction = 'sum' if args.private else 'mean'
+    # reduction = 'sum' if args.private else 'mean'
+    reduction = 'sum'
     loss_function = get_loss_function(args.loss_function, reduction=reduction)
     logger.debug(f'loss function set to {args.loss_function} reduction {reduction}')
 
     net, loss_function = pretrain_actions(model=net, loss_func=loss_function)
     logger.debug('model and loss functions prepared for per sample grads')
 
-    optimizer = get_optimizer(optimizer_name=args.optimizer, model=net, lr=args.lr)
+    optimizer = get_optimizer(args=args, model=net)
     logger.debug(f'optimizer set to {args.optimizer} lr {args.lr}')
 
     train_loader = get_train_loader(root=args.data_root, batchsize=args.batchsize)
@@ -125,12 +128,15 @@ def train(args, logger: logging.Logger):
 
     sigma_list = [dp_params.sigma] * args.num_epochs
     if args.dynamic_noise:
+        sigma_decrease_function = get_decrease_function(args)
+        logger.debug(f'Using decrease function {sigma_decrease_function.__name__}')
         sigma_list, accumulated_epsilon_list, accumulated_epsilon_bar_list, sigma_orig = (
             get_varying_sigma_values(q=dp_params.sampling_prob,
                                      n_epoch=args.num_epochs,
                                      eps=args.eps, delta=dp_params.delta,
                                      initial_sigma_factor=args.dynamic_noise_high_factor,
-                                     final_sigma_factor=args.dynamic_noise_low_factor))
+                                     final_sigma_factor=args.dynamic_noise_low_factor,
+                                     decrease_func=sigma_decrease_function))
 
         logger.info(f'Created varying sigma list with {len(sigma_list)} values')
         logger.debug(f'Sigma list: {sigma_list}')
@@ -148,10 +154,10 @@ def train(args, logger: logging.Logger):
 
     num_epochs = min(args.num_epochs, len(sigma_list)) if args.dynamic_noise else args.num_epochs
 
-    embedder = SVDEmbedder(args.num_basis)
-    # embedder = KernelPCAEmbedder(args.num_basis)
 
-    logger.debug(f'Created SVDEmbedder with {args.num_basis} basis elements')
+    embedder = embeddings.factory.get_embedder(args)
+
+    logger.debug(f'Created {args.embedder} embedder with {args.num_basis} basis elements')
 
     public_inputs, public_targets = get_aux_data(aux_data_root=args.data_root,
                                                  aux_dataset=args.aux_dataset,

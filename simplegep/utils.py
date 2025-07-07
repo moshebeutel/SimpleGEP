@@ -36,10 +36,9 @@ def parse_args(description: str):
                         help='Differential privacy method: dp_sgd, gep. Default: dp_sgd.')
     parser.add_argument('--private', '-p', action='store_true', help='enable differential privacy')
     parser.add_argument('--dynamic_noise', action='store_true', help='varying noise levels for each epoch')
-    parser.add_argument('--dynamic_noise_high_factor', default=10., type=float,
-                        help='highest noise factor for varying mechanism')
-    parser.add_argument('--dynamic_noise_low_factor', default=0.1, type=float,
-                        help='lowest noise factor for varying mechanism')
+    parser.add_argument('--dynamic_noise_high_factor', default=10., type=float, help='highest noise factor for varying mechanism')
+    parser.add_argument('--dynamic_noise_low_factor', default=0.1, type=float, help='lowest noise factor for varying mechanism')
+    parser.add_argument('--decrease_shape', default='linear', type=str, choices=['linear', 'geometric', 'logarithmic'])
 
     parser.add_argument('--clip_strategy', default='median', type=str, choices=['value', 'median', 'max'],
                         help='clip strategy name: value, median, max')
@@ -47,6 +46,7 @@ def parse_args(description: str):
     parser.add_argument('--eps', default=8., type=float, help='privacy parameter epsilon')
 
     ## arguments for GEP
+    parser.add_argument('--embedder', default='svd', type=str, choices=['svd', 'kernel_pca'], help='embedder name for GEP')
     parser.add_argument('--num_basis', default=100, type=int, help='total number of basis elements')
 
     parser.add_argument('--real_labels', action='store_true', help='use real labels for auxiliary dataset')
@@ -57,7 +57,6 @@ def parse_args(description: str):
 
     args = parser.parse_args()
     return args
-
 
 def load_checkpoint(checkpoint_path: str, net: torch.nn.Module, optimizer):
     checkpoint_path = Path(checkpoint_path)
@@ -137,6 +136,7 @@ def eval_model(net, loss_function, loader):
     with torch.no_grad():
         pbar = tqdm(enumerate(loader), total=len(loader))
         for batch_idx, (inputs, targets) in pbar:
+
             inputs, targets = inputs.cuda(), targets.cuda()
             outputs = net(inputs)
             loss = loss_function(outputs, targets)

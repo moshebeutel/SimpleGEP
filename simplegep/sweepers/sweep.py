@@ -39,27 +39,63 @@ def main(args):
     logger.info(f'Logger is set - session: {args.sess}')
     logger.info(f'Arguments: {args}')
 
-    sweep_configuration = {
-        "name": f"{args.dp_method.upper()}_SEED_{args.seed}_TINY",
-        # "name": f"GEP_SEED_2_TINY_COMPARE",
-        "method": "grid",
-        "metric": {"goal": "maximize", "name": "test_acc"},
-        "parameters": {
+    default_parameters = {
             "lr": {"values": [1e-4]},
             "seed": {"values": [3]},
             "clip_value": {"values": [35.0]},
             "clip_strategy": {"values": ["median"]},
-            "eps": {"values": [8.0]},
+            "eps": {"values": [args.eps]},
             "optimizer": {"values": ["adam"]},
             "momentum": {"values": [0.9]},
             "filters": {"values": [4]},
+            "embedder": {"values": ["svd"]},
             "dynamic_noise": {"values": [True] },
-            "dynamic_noise_high_factor": {"values": [10.0, 5.0, 2.0]},
-            "dynamic_noise_low_factor": {"values": [0.75, 0.5, 0.1]},
+            "dynamic_noise_high_factor": {"values": [3.2]},
+            "dynamic_noise_low_factor": {"values": [0.4]},
+            "decrease_shape": {"values": ["geometric"]},
             "num_epochs": {"values": [25]},
-            # "num_bases": {"values": [1000]},
+            "num_bases": {"values": [200]},
             "aux_data_size": {"values": [2000]},
             "batchsize": {"values": [256]}
+    }
+
+    dynamic_noise_parameters = {
+        "dynamic_noise": {"values": [True]},
+        "dynamic_noise_high_factor": {"values": [1.1, 1.2]},
+        "dynamic_noise_low_factor": {"values": [0.6]},
+        "decrease_shape": {"values": ["linear", "geometric", "logarithmic"]}
+    }
+
+    optimizer_parameters = {
+        "optimizer": {"values": ["adam", "sgd"]},
+        "momentum": {"values": [0.9]},
+        "weight_decay": {"values": [0.0001, 0.001, 0.01]},
+        "lr": {"values": [1e-4, 5e-5]},
+    }
+
+    dp_parameters = {
+        "eps": {"values": [args.eps]},
+        "clip_value": {"values": [35.0, 5.0]},
+        "clip_strategy": {"values": ["value", "median", "max"]},
+    }
+
+    gep_parameters = {
+        "num_bases": {"values": [100, 200]},
+        "embedder": {"values": ["svd", "kernel_pca"]},
+    }
+
+
+
+    sweep_configuration = {
+        "name": f"{args.dp_method.upper()}_SEED_{args.seed}_TINY_EPS_{args.eps}",
+        "method": "grid",
+        "metric": {"goal": "maximize", "name": "test_acc"},
+        "parameters": {
+            **default_parameters,
+            **optimizer_parameters,
+            # **dp_parameters,
+            # **gep_parameters,
+            # **dynamic_noise_parameters
         }
     }
 

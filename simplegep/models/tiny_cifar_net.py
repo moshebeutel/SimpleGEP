@@ -1,7 +1,9 @@
+from simplegep.models.utils import count_parameters
 from torch import nn
 
+
 class TinyCifarNet(nn.Module):
-    def __init__(self, num_filters = 4):
+    def __init__(self, num_filters=4):
         super(TinyCifarNet, self).__init__()
         self.representation_size = num_filters * 7 * 7
         self.conv1 = nn.Conv2d(3, num_filters, 3, padding=1, stride=2)
@@ -21,11 +23,28 @@ class TinyCifarNet(nn.Module):
         assert x.size(0) == batch_size, f'output shape error. Expected {batch_size} but got {x.size(0)}'
         return x
 
+
 def tiny_cifar_net_4():
     return TinyCifarNet(num_filters=4)
+
 
 def tiny_cifar_net_8():
     return TinyCifarNet(num_filters=8)
 
+
 def tiny_cifar_net_16():
     return TinyCifarNet(num_filters=16)
+
+
+def tiny_cifar_net_32():
+    return TinyCifarNet(num_filters=32)
+
+
+def tiny_cifar_net_64():
+    return TinyCifarNet(num_filters=64)
+
+
+if __name__ == '__main__':
+    net = tiny_cifar_net_64()
+    num_params = count_parameters(net)
+    print(f'net has {num_params} parameters')

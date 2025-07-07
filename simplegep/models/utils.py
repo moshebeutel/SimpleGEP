@@ -1,5 +1,6 @@
 from torch import nn
 
+
 def initialize_weights(module: nn.Module):
     for m in module.modules():
 
@@ -17,6 +18,7 @@ def initialize_weights(module: nn.Module):
         elif isinstance(m, nn.Linear):
             nn.init.kaiming_normal_(m.weight)
             m.bias.data.zero_()
+
 
 def count_parameters(model, return_layer_sizes=False):
     if not return_layer_sizes:

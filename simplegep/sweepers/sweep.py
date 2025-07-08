@@ -54,15 +54,16 @@ def main(args):
             "dynamic_noise_low_factor": {"values": [0.4]},
             "decrease_shape": {"values": ["geometric"]},
             "num_epochs": {"values": [25]},
-            "num_bases": {"values": [200]},
+            "num_basis": {"values": [200]},
+            "grads_history_size": {"values": [3000]},
             "aux_data_size": {"values": [2000]},
             "batchsize": {"values": [256]}
     }
 
     dynamic_noise_parameters = {
         "dynamic_noise": {"values": [True]},
-        "dynamic_noise_high_factor": {"values": [1.1, 1.2]},
-        "dynamic_noise_low_factor": {"values": [0.6]},
+        "dynamic_noise_high_factor": {"values": [4.0, 3.6, 3.4, 3.2, 3.0, 2.8, 2.6]},
+        "dynamic_noise_low_factor": {"values": [0.4, 0.45, 0.5, 0.55, 0.6]},
         "decrease_shape": {"values": ["linear", "geometric", "logarithmic"]}
     }
 
@@ -80,8 +81,14 @@ def main(args):
     }
 
     gep_parameters = {
-        "num_bases": {"values": [100, 200]},
+        "num_basis": {"values": [10, 200]},
         "embedder": {"values": ["svd", "kernel_pca"]},
+        "grads_history_size": {"values": [1000, 3000]},
+    }
+
+    gep_kernel_pca_parameters = {
+        "embedder": {"values": ["kernel_pca"]},
+        "kernel_type": {"values": ["linear", "rbf", "poly", "cosine", "sigmoid"]},
     }
 
 
@@ -92,9 +99,10 @@ def main(args):
         "metric": {"goal": "maximize", "name": "test_acc"},
         "parameters": {
             **default_parameters,
-            **optimizer_parameters,
+            # **optimizer_parameters,
             # **dp_parameters,
             # **gep_parameters,
+            # **gep_kernel_pca_parameters,
             # **dynamic_noise_parameters
         }
     }

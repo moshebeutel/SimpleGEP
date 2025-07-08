@@ -4,7 +4,7 @@ import torch
 from tqdm import tqdm
 from simplegep.data.cifar_loader import get_train_loader, get_test_loader
 from simplegep.dp.dp_params import get_dp_params
-from simplegep.dp.dp_sgd import GradsProcessor
+from simplegep.dp.grads_proc import GradsProcessor
 from simplegep.dp.dynamic_dp import get_varying_sigma_values, get_decrease_function
 from simplegep.dp.per_sample_grad import pretrain_actions, backward_pass_get_batch_grads
 from simplegep.models.factory import get_model

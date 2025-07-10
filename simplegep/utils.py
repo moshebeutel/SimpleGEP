@@ -47,7 +47,9 @@ def parse_args(description: str):
 
     ## arguments for GEP
     parser.add_argument('--embedder', default='svd', type=str, choices=['svd', 'kernel_pca'], help='embedder name for GEP')
-    parser.add_argument('--num_basis', default=100, type=int, help='total number of basis elements')
+    parser.add_argument('--kernel_type', default='rbf', type=str, choices=["linear", "rbf", "poly", "sigmoid", "cosine"], help='embedder name for GEP')
+    parser.add_argument('--num_basis', default=1000, type=int, help='total number of basis elements')
+    parser.add_argument('--grads_history_size', default=1000, type=int, help='total number of history grads to keep for basis calculation')
 
     parser.add_argument('--real_labels', action='store_true', help='use real labels for auxiliary dataset')
     parser.add_argument('--aux_dataset', default='imagenet', type=str,
@@ -162,7 +164,7 @@ def eval_model(net, loss_function, loader):
             gc.collect()
             torch.cuda.empty_cache()
 
-        test_acc = 100. * float(correct) / float(total)
+        test_acc = 100.*float(correct)/float(total)
         test_loss = test_loss / batch_idx
 
     return test_loss, test_acc

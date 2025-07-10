@@ -51,8 +51,6 @@ def geometric_decrease(upper_bound, lower_bound, num_values):
     return [upper_bound * factor ** i for i in range(num_values)]
 
 
-def get_varying_sigma_values(q, n_epoch, eps, delta, initial_sigma_factor, final_sigma_factor, decrease_linearly=True):
-
 def logarithmic_decrease(upper_bound, lower_bound, num_values):
     # Convex functions
     funcs = {
@@ -65,16 +63,17 @@ def logarithmic_decrease(upper_bound, lower_bound, num_values):
         t = np.linspace(0, 1, n)
         return a - (a - b) * func(t)
 
-
     # return convex_subdivision(upper_bound, lower_bound, num_values, func=funcs[r"$x^2$"])
     return convex_subdivision(upper_bound, lower_bound, num_values, func=funcs[r"$x^3$"])
     # return convex_subdivision(upper_bound, lower_bound, num_values, func=funcs[r"$e^x$ (normalized)"])
 
 
 def get_decrease_function(args):
-    get_decrease_function.hub = {'linear': linear_decrease, 'geometric': geometric_decrease, 'logarithmic': logarithmic_decrease}
-    assert args.decrease_shape in ['linear', 'geometric', 'logarithmic'], (f"Unknown decrease shape {args.decrease_shape}."
-                                                                           f" Expected one of 'linear', 'geometric', 'logarithmic'.")
+    get_decrease_function.hub = {'linear': linear_decrease, 'geometric': geometric_decrease,
+                                 'logarithmic': logarithmic_decrease}
+    assert args.decrease_shape in ['linear', 'geometric', 'logarithmic'], (
+        f"Unknown decrease shape {args.decrease_shape}."
+        f" Expected one of 'linear', 'geometric', 'logarithmic'.")
     return get_decrease_function.hub[args.decrease_shape]
 
 
@@ -93,6 +92,7 @@ def get_varying_sigma_values(q, n_epoch, eps, delta, initial_sigma_factor, final
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
+
     batchsize = 256
     n_training = 50000
     n_epoch = 25
@@ -103,16 +103,17 @@ if __name__ == "__main__":
     sampling_prob = batchsize / n_training
     steps = int(n_epoch / sampling_prob)
 
-
     # Plot
     plt.figure(figsize=(10, 6))
 
     for decrease_function in [linear_decrease, geometric_decrease, logarithmic_decrease]:
-    # for decrease_function in [concave_decrease]:
-        sigmas, accumulated_epsilon, accumulated_epsilon_bar, sigma_orig = get_varying_sigma_values(sampling_prob, n_epoch, epsilon, delta,
-                                                                                                initial_sigma_factor=initial_sigma_factor,
-                                                                                                final_sigma_factor=final_sigma_factor,
-                                                                                                decrease_func=decrease_function)
+        # for decrease_function in [concave_decrease]:
+        sigmas, accumulated_epsilon, accumulated_epsilon_bar, sigma_orig = get_varying_sigma_values(sampling_prob,
+                                                                                                    n_epoch, epsilon,
+                                                                                                    delta,
+                                                                                                    initial_sigma_factor=initial_sigma_factor,
+                                                                                                    final_sigma_factor=final_sigma_factor,
+                                                                                                    decrease_func=decrease_function)
         print(f"Decrease Function {decrease_function.__name__}")
         print('**************************************************')
         print(f"Number of sigmas: {len(sigmas)}")
@@ -126,8 +127,6 @@ if __name__ == "__main__":
 
         plt.plot(range(len(sigmas)), sigmas, label=decrease_function.__name__)
 
-
-
     plt.title(f"Sigma factor decrease from {initial_sigma_factor} to {final_sigma_factor}")
     plt.xlabel("Subdivision index")
     plt.ylabel("Value")
@@ -135,4 +134,3 @@ if __name__ == "__main__":
     plt.legend()
     plt.tight_layout()
     plt.show()
-

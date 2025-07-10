@@ -20,7 +20,8 @@ from simplegep.trainers.optimizer_factory import get_optimizer
 from simplegep.utils import eval_model
 
 
-def train_epoch(net, loss_function, optimizer, train_loader, grads_processor, embedder: Embedder, pub_data_grads: PublicDataPerSampleGrad):
+def train_epoch(net, loss_function, optimizer, train_loader, grads_processor, embedder: Embedder,
+                pub_data_grads: PublicDataPerSampleGrad):
     pub_grads = pub_data_grads.get_grads(current_state_dict=net.state_dict())
     embedder.calc_embedding_space(pub_grads)
     train_loss, train_acc = 0.0, 0.0
@@ -54,20 +55,20 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor, em
         processed_embeddings = grads_processor.process_grads(embedded_grads)
         reconstructed_grads = embedder.project_back(processed_embeddings)
 
-
         # substitute perturbed grads
         processed_grads = reconstructed_grads.squeeze()
         offset = 0
-        for param in net.parameters() :
+        for param in net.parameters():
             numel = param.numel()
-            grad = processed_grads[offset:offset+numel].reshape(param.shape).to(param.device)
+            grad = processed_grads[offset:offset + numel].reshape(param.shape).to(param.device)
             param.grad = grad.clone().reshape(param.shape)
             offset += numel
 
         # update net parameters
         optimizer.step()
 
-        pbar.set_description(f'Batch {batch_idx}/{len(train_loader)} train loss {loss.item()} train accuracy {batch_acc}')
+        pbar.set_description(
+            f'Batch {batch_idx}/{len(train_loader)} train loss {loss.item()} train accuracy {batch_acc}')
 
         # free gpu memory
         inputs, targets, outputs, loss = (inputs.detach().cpu(), targets.detach().cpu(),
@@ -154,7 +155,6 @@ def train(args, logger: logging.Logger):
 
     num_epochs = min(args.num_epochs, len(sigma_list)) if args.dynamic_noise else args.num_epochs
 
-
     embedder = embeddings.factory.get_embedder(args)
 
     logger.debug(f'Created {args.embedder} embedder with {args.num_basis} basis elements')
@@ -184,7 +184,8 @@ def train(args, logger: logging.Logger):
                        'test_acc': test_acc, 'sigma': sigma_list[epoch]}, step=epoch)
             if args.dynamic_noise:
                 wandb.log({'accumulated_epsilon': accumulated_epsilon_list[epoch],
-                       'accumulated_epsilon_bar': accumulated_epsilon_bar_list[epoch]}, step=epoch)
+                           'accumulated_epsilon_bar': accumulated_epsilon_bar_list[epoch]}, step=epoch)
+
 
 def get_aux_data(aux_data_root: Path, aux_dataset: str, aux_data_size: int, real_labels: bool):
     ## preparing auxiliary data
@@ -195,7 +196,8 @@ def get_aux_data(aux_data_root: Path, aux_dataset: str, aux_data_size: int, real
                 torchvision.transforms.ToTensor(),
                 torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
             ])
-            testset = torchvision.datasets.CIFAR100(root=aux_data_root, train=False, download=True, transform=transform_test)
+            testset = torchvision.datasets.CIFAR100(root=aux_data_root, train=False, download=True,
+                                                    transform=transform_test)
         public_data_loader = torch.utils.data.DataLoader(testset, batch_size=num_public_examples, shuffle=False,
                                                          num_workers=2)  #
         for public_inputs, public_targets in public_data_loader:
@@ -206,7 +208,3 @@ def get_aux_data(aux_data_root: Path, aux_dataset: str, aux_data_size: int, real
     if (not real_labels):
         public_targets = torch.randint(high=10, size=(num_public_examples,))
     return public_inputs, public_targets
-
-
-
-

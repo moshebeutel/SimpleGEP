@@ -40,23 +40,23 @@ def main(args):
     logger.info(f'Arguments: {args}')
 
     default_parameters = {
-            "lr": {"values": [1e-4]},
-            "seed": {"values": [3]},
-            "clip_value": {"values": [35.0]},
-            "clip_strategy": {"values": ["median"]},
-            "eps": {"values": [args.eps]},
-            "optimizer": {"values": ["adam"]},
-            "momentum": {"values": [0.9]},
-            "filters": {"values": [4]},
-            "embedder": {"values": ["svd"]},
-            "dynamic_noise": {"values": [True] },
-            "dynamic_noise_high_factor": {"values": [3.2]},
-            "dynamic_noise_low_factor": {"values": [0.4]},
-            "decrease_shape": {"values": ["geometric"]},
-            "num_epochs": {"values": [25]},
-            "num_bases": {"values": [200]},
-            "aux_data_size": {"values": [2000]},
-            "batchsize": {"values": [256]}
+        "lr": {"values": [1e-4]},
+        "seed": {"values": [3]},
+        "clip_value": {"values": [35.0]},
+        "clip_strategy": {"values": ["median"]},
+        "eps": {"values": [args.eps]},
+        "optimizer": {"values": ["adam"]},
+        "momentum": {"values": [0.9]},
+        "filters": {"values": [4]},
+        "embedder": {"values": ["svd"]},
+        "dynamic_noise": {"values": [False]},
+        # "dynamic_noise_high_factor": {"values": [3.2]},
+        # "dynamic_noise_low_factor": {"values": [0.4]},
+        # "decrease_shape": {"values": ["geometric"]},
+        "num_epochs": {"values": [25]},
+        "num_bases": {"values": [200]},
+        "aux_data_size": {"values": [2000]},
+        "batchsize": {"values": [256]}
     }
 
     dynamic_noise_parameters = {
@@ -80,11 +80,9 @@ def main(args):
     }
 
     gep_parameters = {
-        "num_bases": {"values": [100, 200]},
-        "embedder": {"values": ["svd", "kernel_pca"]},
+        "num_bases": {"values": [50, 100, 200]},
+        "embedder": {"values": ["kernel_pca"]},
     }
-
-
 
     sweep_configuration = {
         "name": f"{args.dp_method.upper()}_SEED_{args.seed}_TINY_EPS_{args.eps}",
@@ -92,9 +90,9 @@ def main(args):
         "metric": {"goal": "maximize", "name": "test_acc"},
         "parameters": {
             **default_parameters,
-            **optimizer_parameters,
+            # **optimizer_parameters,
             # **dp_parameters,
-            # **gep_parameters,
+            **gep_parameters,
             # **dynamic_noise_parameters
         }
     }

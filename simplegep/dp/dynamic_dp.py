@@ -1,4 +1,6 @@
 import math
+from functools import partial
+
 import numpy as np
 from tqdm import trange
 from simplegep.dp.rdp_accountant import compute_rdp, get_privacy_spent, get_sigma
@@ -49,6 +51,17 @@ def linear_decrease(upper_bound, lower_bound, num_values):
 def geometric_decrease(upper_bound, lower_bound, num_values):
     factor = (lower_bound / upper_bound) ** (1 / num_values)
     return [upper_bound * factor ** i for i in range(num_values)]
+# def geometric_decrease(upper_bound, lower_bound, num_values, curvature_exponent=1.0):
+#     base_factor = (lower_bound / upper_bound) ** (1 / num_values)
+#     return [
+#         upper_bound * (base_factor ** (i ** curvature_exponent))
+#         for i in range(1, num_values+1)
+#     ]
+# def geometric_decrease(upper_bound, lower_bound, num_values, curvature_exponent=1.0):
+#     return [
+#         upper_bound * ((lower_bound / upper_bound) ** ((i / (num_values - 1)) ** curvature_exponent))
+#         for i in range(num_values)
+#     ]
 
 
 def logarithmic_decrease(upper_bound, lower_bound, num_values):
@@ -91,8 +104,10 @@ def get_varying_sigma_values(q, n_epoch, eps, delta, initial_sigma_factor, final
 
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
+    import matplotlib
 
+    matplotlib.use('TkAgg')
+    import matplotlib.pyplot as plt
     batchsize = 256
     n_training = 50000
     n_epoch = 25
@@ -106,15 +121,20 @@ if __name__ == "__main__":
     # Plot
     plt.figure(figsize=(10, 6))
 
-    for decrease_function in [linear_decrease, geometric_decrease, logarithmic_decrease]:
+    curvatures = [1.0, 0.5,  1.1]
+    geometric_decrease_funcs = [partial(geometric_decrease, curvature_exponent=v) for v in curvatures]
+    for crv, decrease_function in zip(curvatures, geometric_decrease_funcs):
+    # for decrease_function in [linear_decrease, geometric_decrease, logarithmic_decrease]:
+
         # for decrease_function in [concave_decrease]:
         sigmas, accumulated_epsilon, accumulated_epsilon_bar, sigma_orig = get_varying_sigma_values(sampling_prob,
-                                                                                                    n_epoch, epsilon,
+                                                                                                    int(n_epoch), epsilon,
                                                                                                     delta,
                                                                                                     initial_sigma_factor=initial_sigma_factor,
                                                                                                     final_sigma_factor=final_sigma_factor,
                                                                                                     decrease_func=decrease_function)
-        print(f"Decrease Function {decrease_function.__name__}")
+        print(f"Decrease Function geometric curvature {crv}")
+        # print(f"Decrease Function {decrease_function.__name__}")
         print('**************************************************')
         print(f"Number of sigmas: {len(sigmas)}")
         print(f'First sigma: {sigmas[0]}')
@@ -125,7 +145,9 @@ if __name__ == "__main__":
         print(f"Accumulated epsilons: {accumulated_epsilon}")
         print(f"Accumulated epsilon-bars: {accumulated_epsilon_bar}")
 
-        plt.plot(range(len(sigmas)), sigmas, label=decrease_function.__name__)
+        # plt.plot(range(len(sigmas)), sigmas, label=f'geometric curvature exponent {crv}')
+        plt.scatter(range(len(sigmas)), sigmas, label=f'geometric curvature exponent {crv}')
+        # plt.plot(range(len(sigmas)), sigmas, label=decrease_function.__name__)
 
     plt.title(f"Sigma factor decrease from {initial_sigma_factor} to {final_sigma_factor}")
     plt.xlabel("Subdivision index")

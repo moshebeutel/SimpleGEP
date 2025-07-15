@@ -14,8 +14,6 @@ class SVDEmbedder(Embedder):
         self._center = None
         self._scale = None
 
-
-
     def calc_embedding_space(self, data: torch.Tensor):
         normalized_x, self._center, self._scale = normalize_return_transform(data)
         self._U, self._S, Vh = torch.linalg.svd(normalized_x, full_matrices=False)
@@ -35,4 +33,3 @@ class SVDEmbedder(Embedder):
             reconstructed = torch.matmul(embedding, self._basis_elements.t())
         reconstructed_transformed = (reconstructed * self._scale) + self._center
         return reconstructed_transformed
-

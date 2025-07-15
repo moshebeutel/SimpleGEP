@@ -3,6 +3,7 @@ from simplegep.embeddings.svd_embedder import SVDEmbedder
 
 embedder_hub = {'svd': SVDEmbedder, 'kernel_pca': KernelPCAEmbedder}
 
+
 def get_embedder(args):
     assert args.embedder in embedder_hub, f"Embedder {args.embedder} not found. Expected one of {embedder_hub.keys()}."
     ctor_func = embedder_hub[args.embedder]

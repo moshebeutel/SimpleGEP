@@ -61,20 +61,20 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor,
         processed_embeddings = grads_processor.process_grads(embedded_grads)
         reconstructed_grads = embedder.project_back(processed_embeddings)
 
-
         # substitute perturbed grads
         processed_grads = reconstructed_grads.squeeze()
         offset = 0
-        for param in net.parameters() :
+        for param in net.parameters():
             numel = param.numel()
-            grad = processed_grads[offset:offset+numel].reshape(param.shape).to(param.device)
+            grad = processed_grads[offset:offset + numel].reshape(param.shape).to(param.device)
             param.grad = grad.clone().reshape(param.shape)
             offset += numel
 
         # update net parameters
         optimizer.step()
 
-        pbar.set_description(f'Batch {batch_idx}/{len(train_loader)} train loss {loss.item()} train accuracy {batch_acc}')
+        pbar.set_description(
+            f'Batch {batch_idx}/{len(train_loader)} train loss {loss.item()} train accuracy {batch_acc}')
 
         # free gpu memory
         inputs, targets, outputs, loss = (inputs.detach().cpu(), targets.detach().cpu(),
@@ -194,7 +194,7 @@ def train(args, logger: logging.Logger):
                        'test_acc': test_acc, 'sigma': sigma_list[epoch]}, step=epoch)
             if args.dynamic_noise:
                 wandb.log({'accumulated_epsilon': accumulated_epsilon_list[epoch],
-                       'accumulated_epsilon_bar': accumulated_epsilon_bar_list[epoch]}, step=epoch)
+                           'accumulated_epsilon_bar': accumulated_epsilon_bar_list[epoch]}, step=epoch)
 
 def get_aux_data(aux_data_root: Path, aux_dataset: str, aux_data_size: int, real_labels: bool):
     ## preparing auxiliary data
@@ -216,7 +216,3 @@ def get_aux_data(aux_data_root: Path, aux_dataset: str, aux_data_size: int, real
     if (not real_labels):
         public_targets = torch.randint(high=10, size=(num_public_examples,))
     return public_inputs, public_targets
-
-
-
-

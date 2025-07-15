@@ -62,8 +62,8 @@ def main(args):
 
     dynamic_noise_parameters = {
         "dynamic_noise": {"values": [True]},
-        "dynamic_noise_high_factor": {"values": [4.0, 3.6, 3.4, 3.2, 3.0, 2.8, 2.6]},
-        "dynamic_noise_low_factor": {"values": [0.4, 0.45, 0.5, 0.55, 0.6]},
+        "dynamic_noise_high_factor": {"values": [1.1, 1.2]},
+        "dynamic_noise_low_factor": {"values": [0.6]},
         "decrease_shape": {"values": ["linear", "geometric", "logarithmic"]}
     }
 

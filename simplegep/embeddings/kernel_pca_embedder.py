@@ -6,7 +6,7 @@ from simplegep.embeddings.utils import normalize_return_transform
 
 
 class KernelPCAEmbedder(Embedder):
-    def __init__(self, num_basis_elements: int, kernel_type: str = 'rbf', gamma: Optional[float] = None):
+    def __init__(self, num_basis_elements: int, kernel_type: str = 'cosine', gamma: Optional[float] = None):
         super(KernelPCAEmbedder).__init__()
         self._num_basis_elements = num_basis_elements
         self._kernel_type = kernel_type

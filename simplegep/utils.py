@@ -13,6 +13,8 @@ from tqdm import tqdm
 def parse_args(description: str):
     parser = argparse.ArgumentParser(description=description)
     project_dir = Path(__file__).resolve().parent
+    # model_name = 'resnet20'
+    model_name = 'tiny_cifar_net_4'
     ## general arguments
     parser.add_argument('--dataset', default='cifar10', type=str, help='dataset name')
     parser.add_argument('--data_root', default= project_dir / 'data', type=str, help='dataset directory')
@@ -20,8 +22,8 @@ def parse_args(description: str):
     parser.add_argument('--log_level', default= 'DEBUG', type=str, choices=['DEBUG', 'INFO'],
                         help='log level: DEBUG, INFO Default: DEBUG.')
     parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
-    parser.add_argument('--sess', default='resnet20_cifar10', type=str, help='session name')
-    parser.add_argument('--model_name', default='tiny_cifar_net_4', type=str, help='model name')
+    parser.add_argument('--sess', default=f'{model_name}_cifar10', type=str, help='session name')
+    parser.add_argument('--model_name', default=model_name, type=str, help='model name')
     parser.add_argument('--loss_function', default='cross_entropy', type=str, help='loss function name')
     parser.add_argument('--optimizer', default='adam', type=str, help='optimizer name')
     parser.add_argument('--seed', default=2, type=int, help='random seed')

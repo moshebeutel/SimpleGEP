@@ -161,6 +161,8 @@ def train(args, logger: logging.Logger):
 
     num_epochs = min(args.num_epochs, len(sigma_list)) if args.dynamic_noise else args.num_epochs
 
+    lr_shceduler = torch.optim.lr_scheduler.StepLR(step_size=num_epochs//2, optimizer=optimizer, gamma=0.1)
+    logger.debug(f'Initialized lr scheduler step {num_epochs//2} gamma {0.1}')
 
     embedder = embeddings.factory.get_embedder(args)
 
@@ -191,10 +193,12 @@ def train(args, logger: logging.Logger):
         logger.info(f'Epoch {epoch}/{args.num_epochs} test loss {test_loss:.2f} test accuracy {test_acc:.2f}')
         if args.wandb:
             wandb.log({'train_loss': train_loss, 'train_acc': train_acc, 'test_loss': test_loss,
-                       'test_acc': test_acc, 'sigma': sigma_list[epoch]}, step=epoch)
+                       'test_acc': test_acc,
+                       'sigma': sigma_list[epoch]}, step=epoch)
             if args.dynamic_noise:
                 wandb.log({'accumulated_epsilon': accumulated_epsilon_list[epoch],
                            'accumulated_epsilon_bar': accumulated_epsilon_bar_list[epoch]}, step=epoch)
+        lr_shceduler.step()
 
 def get_aux_data(aux_data_root: Path, aux_dataset: str, aux_data_size: int, real_labels: bool):
     ## preparing auxiliary data

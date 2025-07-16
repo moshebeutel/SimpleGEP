@@ -90,14 +90,19 @@ def get_decrease_function(args):
     return get_decrease_function.hub[args.decrease_shape]
 
 
-def get_varying_sigma_values(q, n_epoch, eps, delta, initial_sigma_factor, final_sigma_factor, decrease_func):
+def get_varying_sigma_values(q, n_epoch, eps, delta,
+                             initial_sigma_factor, final_sigma_factor, decrease_func,
+                             extra_noise_units=0, noise_for_step=0):
     assert initial_sigma_factor > final_sigma_factor, "Initial sigma factor must be greater than final sigma factor"
     assert final_sigma_factor > 0, "Final sigma factor must be greater than 0"
 
     steps_in_epoch = int(1 / q)
     sigma_orig, previous_eps = get_sigma(q=q, T=steps_in_epoch * n_epoch, eps=eps, delta=delta)
     decrease_factors = decrease_func(initial_sigma_factor, final_sigma_factor, n_epoch)
-    sigmas = [sigma_orig * sigma_factor for sigma_factor in decrease_factors]
+    sigmas = np.array([sigma_orig * sigma_factor for sigma_factor in decrease_factors])
+    if extra_noise_units > 0:
+        steps_to_add = extra_noise_units // noise_for_step
+        sigmas[:steps_to_add] = sigmas[:steps_to_add] + noise_for_step
     accumulated_epsilon_list, accumulated_epsilon_bar_list = calc_privacy_spent_by_sigma(q, eps, delta, sigmas)
     num_epochs_to_reach_eps = len(accumulated_epsilon_list)
     return sigmas[:num_epochs_to_reach_eps], accumulated_epsilon_list, accumulated_epsilon_bar_list, sigma_orig
@@ -110,7 +115,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     batchsize = 256
     n_training = 50000
-    n_epoch = 25
+    n_epoch = 200
     delta = 1 / n_epoch
     epsilon = 1
     initial_sigma_factor = 3.2
@@ -121,37 +126,48 @@ if __name__ == "__main__":
     # Plot
     plt.figure(figsize=(10, 6))
 
-    curvatures = [1.0, 0.5,  1.1]
+    curvatures = [0.5, 1.0]
+    # curvatures = [1.0, 0.8,  1.1]
     geometric_decrease_funcs = [partial(geometric_decrease, curvature_exponent=v) for v in curvatures]
-    for crv, decrease_function in zip(curvatures, geometric_decrease_funcs):
     # for decrease_function in [linear_decrease, geometric_decrease, logarithmic_decrease]:
+    for decrease_function in [linear_decrease]:
+    # for crv, decrease_function in zip(curvatures, geometric_decrease_funcs):
+    #     for extra_noise_units in [0, 10000]:
+    #         if extra_noise_units == 0:
+    #             continue
+    #         for noise_for_step in [100, 1000]:
 
-        # for decrease_function in [concave_decrease]:
-        sigmas, accumulated_epsilon, accumulated_epsilon_bar, sigma_orig = get_varying_sigma_values(sampling_prob,
-                                                                                                    int(n_epoch), epsilon,
-                                                                                                    delta,
-                                                                                                    initial_sigma_factor=initial_sigma_factor,
-                                                                                                    final_sigma_factor=final_sigma_factor,
-                                                                                                    decrease_func=decrease_function)
-        print(f"Decrease Function geometric curvature {crv}")
-        # print(f"Decrease Function {decrease_function.__name__}")
-        print('**************************************************')
-        print(f"Number of sigmas: {len(sigmas)}")
-        print(f'First sigma: {sigmas[0]}')
-        print(f"Final sigma: {sigmas[-1]}")
-        print(f'original sigma: {sigma_orig}')
-        sigmas_above_orig = np.array(sigmas) > sigma_orig
-        print(f"Number of sigmas above original sigma: {sum(sigmas_above_orig)}")
-        print(f"Accumulated epsilons: {accumulated_epsilon}")
-        print(f"Accumulated epsilon-bars: {accumulated_epsilon_bar}")
+                # for decrease_function in [concave_decrease]:
+                sigmas, accumulated_epsilon, accumulated_epsilon_bar, sigma_orig = get_varying_sigma_values(sampling_prob,
+                                                                                                            int(n_epoch), epsilon,
+                                                                                                            delta,
+                                                                                                            initial_sigma_factor=initial_sigma_factor,
+                                                                                                            final_sigma_factor=final_sigma_factor,
+                                                                                                            decrease_func=decrease_function,
+                                                                                                            )
+                                                                                                            # extra_noise_units=extra_noise_units,
+                                                                                                            # noise_for_step=noise_for_step)
+                # print(f"Decrease Function geometric curvature {crv} extra noise units {extra_noise_units}, {noise_for_step} for step")
+                print(f"Decrease Function {decrease_function.__name__}")
+                print('**************************************************')
+                print(f"Number of sigmas: {len(sigmas)}")
+                print(f'First sigma: {sigmas[0]}')
+                print(f"Final sigma: {sigmas[-1]}")
+                print(f'original sigma: {sigma_orig}')
+                sigmas_above_orig = np.array(sigmas) > sigma_orig
+                print(f"Number of sigmas above original sigma: {sum(sigmas_above_orig)}")
+                print(f"Accumulated epsilons: {accumulated_epsilon}")
+                print(f"Accumulated epsilon-bars: {accumulated_epsilon_bar}")
 
-        # plt.plot(range(len(sigmas)), sigmas, label=f'geometric curvature exponent {crv}')
-        plt.scatter(range(len(sigmas)), sigmas, label=f'geometric curvature exponent {crv}')
-        # plt.plot(range(len(sigmas)), sigmas, label=decrease_function.__name__)
+                # plt.plot(range(len(sigmas)), sigmas, label=f'geometric curvature exponent {crv}')
+                # plt.scatter(range(len(sigmas)), sigmas, label=f'geometric curv exp {crv} extra {extra_noise_units}, {noise_for_step} for step')
+                plt.plot(range(len(sigmas)), sigmas, label=decrease_function.__name__)
 
     plt.title(f"Sigma factor decrease from {initial_sigma_factor} to {final_sigma_factor}")
     plt.xlabel("Subdivision index")
     plt.ylabel("Value")
+    plt.xlim(0, 201)
+    plt.ylim(0, 50)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()

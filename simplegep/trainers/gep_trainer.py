@@ -18,7 +18,7 @@ from simplegep.models.factory import get_model
 from simplegep.models.utils import initialize_weights, count_parameters
 from simplegep.trainers.loss_function_factory import get_loss_function
 from simplegep.trainers.optimizer_factory import get_optimizer
-from simplegep.utils import eval_model
+from simplegep.utils import eval_model, load_checkpoint, save_checkpoint
 
 
 def train_epoch(net, loss_function, optimizer, train_loader, grads_processor,
@@ -104,11 +104,17 @@ def train(args, logger: logging.Logger):
     loss_function = get_loss_function(args.loss_function, reduction=reduction)
     logger.debug(f'loss function set to {args.loss_function} reduction {reduction}')
 
-    net, loss_function = pretrain_actions(model=net, loss_func=loss_function)
-    logger.debug('model and loss functions prepared for per sample grads')
-
     optimizer = get_optimizer(args=args, model=net)
     logger.debug(f'optimizer set to {args.optimizer} lr {args.lr}')
+
+    best_acc = 0.0
+    checkpoint_name = ''
+    if args.resume:
+        epoch, best_acc, seed, rng_state = load_checkpoint(checkpoint_path=args.checkpoint, net=net, optimizer=optimizer)
+        assert args.seed == seed, f'Expected checkpoint seed equals session seed. Got {seed} != {args.seed}'
+
+    net, loss_function = pretrain_actions(model=net, loss_func=loss_function)
+    logger.debug('model and loss functions prepared for per sample grads')
 
     train_loader = get_train_loader(root=args.data_root, batchsize=args.batchsize)
     logger.debug(f'train loader created size {len(train_loader)}')
@@ -191,14 +197,22 @@ def train(args, logger: logging.Logger):
         logger.info(f'Epoch {epoch}/{args.num_epochs} train loss {train_loss:.2f} train accuracy {train_acc:.2f}')
         test_loss, test_acc = eval_model(net=net, loss_function=loss_function, loader=test_loader)
         logger.info(f'Epoch {epoch}/{args.num_epochs} test loss {test_loss:.2f} test accuracy {test_acc:.2f}')
+        if test_acc > best_acc:
+            best_acc = test_acc
+            checkpoint_name = save_checkpoint(net=net, optimizer=optimizer, acc=test_acc,
+                                              epoch=epoch,
+                                              seed=args.seed,
+                                              sess=args.sess)
+            logger.info(f'Best Acc = {best_acc}. Checkpoint {checkpoint_name} saved!')
         if args.wandb:
             wandb.log({'train_loss': train_loss, 'train_acc': train_acc, 'test_loss': test_loss,
-                       'test_acc': test_acc,
+                       'test_acc': test_acc, 'best_acc': best_acc,
                        'sigma': sigma_list[epoch]}, step=epoch)
             if args.dynamic_noise:
                 wandb.log({'accumulated_epsilon': accumulated_epsilon_list[epoch],
                            'accumulated_epsilon_bar': accumulated_epsilon_bar_list[epoch]}, step=epoch)
         lr_shceduler.step()
+    return best_acc, checkpoint_name
 
 def get_aux_data(aux_data_root: Path, aux_dataset: str, aux_data_size: int, real_labels: bool):
     ## preparing auxiliary data

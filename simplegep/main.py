@@ -14,6 +14,10 @@ if __name__ == "__main__":
         from simplegep.trainers.gep_trainer import train
     elif args.dp_method == 'dp_sgs':
         from simplegep.trainers.dp_sgd_trainer import train
+    elif args.dp_method == 'super':
+        from simplegep.trainers.super_trainer import train
+        args.dynamic_noise = True
+        args.decrease_shape = 'step'
     else:
         assert args.dp_method == 'no_dp', f'dp_method {args.dp_method} unknown'
         from simplegep.trainers.no_dp_trainer import train

@@ -23,31 +23,33 @@ def parse_args(description: str):
                         help='log level: DEBUG, INFO Default: DEBUG.')
     parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
     parser.add_argument('--sess', default=f'{model_name}_cifar10', type=str, help='session name')
+    parser.add_argument('--checkpoint', default=f'{model_name}_cifar10.ckpt', type=str, help='session name')
     parser.add_argument('--model_name', default=model_name, type=str, help='model name')
     parser.add_argument('--loss_function', default='cross_entropy', type=str, help='loss function name')
     parser.add_argument('--optimizer', default='adam', type=str, help='optimizer name')
     parser.add_argument('--seed', default=2, type=int, help='random seed')
     parser.add_argument('--weight_decay', default=0., type=float, help='weight decay')
     parser.add_argument('--batchsize', default=256, type=int, help='batch size')
-    parser.add_argument('--num_epochs', default=30, type=int, help='total number of epochs')
+    parser.add_argument('--num_epochs', default=10, type=int, help='total number of epochs')
     parser.add_argument('--lr', default=0.001, type=float, help='base learning rate (default=0.1)')
     parser.add_argument('--momentum', default=0.9, type=float, help='value of momentum')
 
     ## arguments for learning with differential privacy
-    parser.add_argument('--dp_method', default="dp_sgd", choices=['no_dp', 'dp_sgd', 'gep'],
-                        help='Differential privacy method: dp_sgd, gep. Default: dp_sgd.')
+    parser.add_argument('--dp_method', default="dp_sgd", choices=['no_dp', 'dp_sgd', 'gep', 'super'],
+                        help='Differential privacy method: dp_sgd, gep, no dp, super. Default: dp_sgd.')
     parser.add_argument('--private', '-p', action='store_true', help='enable differential privacy')
     parser.add_argument('--dynamic_noise', action='store_true', help='varying noise levels for each epoch')
-    parser.add_argument('--dynamic_noise_high_factor', default=10., type=float,
+    parser.add_argument('--dynamic_noise_high_factor', default=20, type=float,
                         help='highest noise factor for varying mechanism')
-    parser.add_argument('--dynamic_noise_low_factor', default=0.1, type=float,
+    parser.add_argument('--dynamic_noise_low_factor', default=0.5, type=float,
                         help='lowest noise factor for varying mechanism')
-    parser.add_argument('--decrease_shape', default='linear', type=str, choices=['linear', 'geometric', 'logarithmic'])
+    parser.add_argument('--decrease_shape', default='step', type=str, choices=['linear', 'geometric', 'logarithmic', 'step'])
 
     parser.add_argument('--clip_strategy', default='median', type=str, choices=['value', 'median', 'max'],
                         help='clip strategy name: value, median, max')
     parser.add_argument('--clip_value', default=5., type=float, help='gradient clipping bound')
-    parser.add_argument('--eps', default=8., type=float, help='privacy parameter epsilon')
+    parser.add_argument('--eps', default=1., type=float, help='privacy parameter epsilon')
+    parser.add_argument('--dp_sigma', default=0., type=float, help='privacy noise factor')
 
     ## arguments for GEP
     parser.add_argument('--embedder', default='svd', type=str, choices=['svd', 'kernel_pca'],
@@ -57,6 +59,7 @@ def parse_args(description: str):
     parser.add_argument('--num_basis', default=1000, type=int, help='total number of basis elements')
     parser.add_argument('--grads_history_size', default=1000, type=int,
                         help='total number of history grads to keep for basis calculation')
+    parser.add_argument('--stop_embedding_epoch', default=1e10, type=int, help='switch to dp sgd after that epoch')
 
     parser.add_argument('--real_labels', action='store_true', help='use real labels for auxiliary dataset')
     parser.add_argument('--aux_dataset', default='imagenet', type=str,
@@ -95,7 +98,9 @@ def save_checkpoint(net, optimizer, acc, epoch, seed, sess):
 
     if not os.path.isdir('checkpoint'):
         os.mkdir('checkpoint')
-    torch.save(state, './checkpoint/' + sess + f'epoch_{epoch}_acc_{acc}.ckpt')
+    checkpoint_name = './checkpoint/' + sess + f'epoch_{epoch}_acc_{acc}.ckpt'
+    torch.save(state, checkpoint_name)
+    return checkpoint_name
 
 
 def set_seed(seed, cudnn_enabled=True):

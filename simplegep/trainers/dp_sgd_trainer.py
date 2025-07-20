@@ -11,7 +11,7 @@ from simplegep.models.factory import get_model
 from simplegep.models.utils import initialize_weights, count_parameters
 from simplegep.trainers.loss_function_factory import get_loss_function
 from simplegep.trainers.optimizer_factory import get_optimizer
-from simplegep.utils import eval_model
+from simplegep.utils import eval_model, load_checkpoint, save_checkpoint
 import wandb
 
 
@@ -90,11 +90,19 @@ def train(args, logger: logging.Logger):
     loss_function = get_loss_function(args.loss_function, reduction=reduction)
     logger.debug(f'loss function set to {args.loss_function} reduction {reduction}')
 
-    net, loss_function = pretrain_actions(model=net, loss_func=loss_function)
-    logger.debug('model and loss functions prepared for per sample grads')
-
     optimizer = get_optimizer(args=args, model=net)
     logger.debug(f'optimizer set to {args.optimizer} lr {args.lr}')
+
+    best_acc = 0.0
+    start_epoch = 0
+    checkpoint_name = ''
+    if args.resume:
+        start_epoch, best_acc, seed, rng_state = load_checkpoint(checkpoint_path=args.checkpoint, net=net,
+                                                                 optimizer=optimizer)
+        assert args.seed == seed, f'Expected checkpoint seed equals session seed. Got {seed} != {args.seed}'
+
+    net, loss_function = pretrain_actions(model=net, loss_func=loss_function)
+    logger.debug('model and loss functions prepared for per sample grads')
 
     train_loader = get_train_loader(root=args.data_root, batchsize=args.batchsize)
     logger.debug(f'train loader created size {len(train_loader)}')
@@ -125,11 +133,11 @@ def train(args, logger: logging.Logger):
         logger.debug(f'Using decrease function {sigma_decrease_function.__name__}')
         sigma_list, accumulated_epsilon_list, accumulated_epsilon_bar_list, sigma_orig = (
             get_varying_sigma_values(q=dp_params.sampling_prob,
-                                              n_epoch=args.num_epochs,
-                                              eps=args.eps, delta=dp_params.delta,
-                                              initial_sigma_factor=args.dynamic_noise_high_factor,
-                                              final_sigma_factor=args.dynamic_noise_low_factor,
-                                     decrease_func=sigma_decrease_function,))
+                                     n_epoch=args.num_epochs,
+                                     eps=args.eps, delta=dp_params.delta,
+                                     initial_sigma_factor=args.dynamic_noise_high_factor,
+                                     final_sigma_factor=args.dynamic_noise_low_factor,
+                                     decrease_func=sigma_decrease_function, ))
 
         logger.info(f'Created varying sigma list with {len(sigma_list)} values')
         logger.debug(f'Sigma list: {sigma_list}')
@@ -145,18 +153,24 @@ def train(args, logger: logging.Logger):
                  f'noise multiplier {dp_params.sigma}'
                  f' clip value {args.clip_value}')
 
-    num_epochs = min(args.num_epochs, len(sigma_list)) if args.dynamic_noise else args.num_epochs
+    num_epochs = min(args.num_epochs - start_epoch, len(sigma_list)) if args.dynamic_noise else args.num_epochs
+    assert num_epochs > start_epoch, f'Expected num epochs > start epoch. Got {num_epochs} <= {start_epoch}'
     net = net.cuda()
-    for epoch in range(num_epochs):
+    for epoch in range(start_epoch, num_epochs):
         logger.info(f'***** Starting epoch {epoch}  ******')
         train_loss, train_acc = train_epoch(net=net, loss_function=loss_function, optimizer=optimizer,
                                             train_loader=train_loader, grads_processor=grads_processor)
         logger.info(f'Epoch {epoch}/{args.num_epochs} train loss {train_loss:.2f} train accuracy {train_acc:.2f}')
         test_loss, test_acc = eval_model(net=net, loss_function=loss_function, loader=test_loader)
         logger.info(f'Epoch {epoch}/{args.num_epochs} test loss {test_loss:.2f} test accuracy {test_acc:.2f}')
+        if test_acc > best_acc:
+            best_acc = test_acc
+            checkpoint_name = save_checkpoint(net, test_acc, epoch, args.sess)
+            logger.info(f'Best Acc = {best_acc}. Checkpoint {checkpoint_name} saved!')
         if args.wandb:
             wandb.log({'train_loss': train_loss, 'train_acc': train_acc, 'test_loss': test_loss,
                        'test_acc': test_acc, 'sigma': sigma_list[epoch]}, step=epoch)
             if args.dynamic_noise:
                 wandb.log({'accumulated_epsilon': accumulated_epsilon_list[epoch],
-                       'accumulated_epsilon_bar': accumulated_epsilon_bar_list[epoch]}, step=epoch)
+                           'accumulated_epsilon_bar': accumulated_epsilon_bar_list[epoch]}, step=epoch)
+    return best_acc, checkpoint_name

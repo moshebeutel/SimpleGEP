@@ -43,21 +43,23 @@ def main(args):
             "lr": {"values": [1e-4]},
             "seed": {"values": [3]},
             "clip_value": {"values": [35.0]},
-            "clip_strategy": {"values": ["median"]},
+            "clip_strategy": {"values": ["value"]},
             "eps": {"values": [args.eps]},
             "optimizer": {"values": ["adam"]},
             "momentum": {"values": [0.9]},
+            "weight_decay": {"values": [1e-4]},
             "filters": {"values": [4]},
             "embedder": {"values": ["svd"]},
-            "dynamic_noise": {"values": [True] },
+            "dynamic_noise": {"values": [False, True]},
             "dynamic_noise_high_factor": {"values": [3.2]},
             "dynamic_noise_low_factor": {"values": [0.4]},
-            "decrease_shape": {"values": ["geometric"]},
-            "num_epochs": {"values": [25]},
-            "num_basis": {"values": [200]},
-            "grads_history_size": {"values": [3000]},
+            "decrease_shape": {"values": ["linear"]},
+            "num_epochs": {"values": [200]},
+            # "stop_embedding_epoch": {"values": [100]},
+            "num_basis": {"values": [2000]},
+            "grads_history_size": {"values": [2000]},
             "aux_data_size": {"values": [2000]},
-            "batchsize": {"values": [256]}
+            "batchsize": {"values": [128]}
     }
 
     dynamic_noise_parameters = {

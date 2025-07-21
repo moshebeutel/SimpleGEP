@@ -24,7 +24,7 @@ def privacy_budget_left(sampling_prob, steps, cur_sigma, delta, rdp_orders=32):
     return float(cur_eps), epsilon_bar
 
 
-def calc_privacy_spent_by_sigma(q, eps, delta, sigmas):
+def calc_privacy_spent_by_sigma(q, eps, delta, sigmas, alpha=32):
     accumulated_epsilon_bar, accumulated_epsilon = 0.0, 0.0
     accumulated_epsilon_bar_list, accumulated_epsilon_list = [], []
     steps_in_epoch = int(1 / q)
@@ -32,7 +32,7 @@ def calc_privacy_spent_by_sigma(q, eps, delta, sigmas):
     for sigma in sigmas:
         epsilon, epsilon_bar = privacy_budget_left(q, steps_in_epoch, sigma, delta)
         accumulated_epsilon_bar += epsilon_bar
-        accumulated_epsilon = get_epsilon_from_epsilon_bar(accumulated_epsilon_bar, 32, delta)
+        accumulated_epsilon = get_epsilon_from_epsilon_bar(accumulated_epsilon_bar, alpha, delta)
         pbar.set_description(
             f"accumulated epsilon: {accumulated_epsilon} accumulated epsilon bar: {accumulated_epsilon_bar}")
         if accumulated_epsilon > eps:
@@ -42,6 +42,31 @@ def calc_privacy_spent_by_sigma(q, eps, delta, sigmas):
 
     return accumulated_epsilon_list, accumulated_epsilon_bar_list
 
+def get_renyi_gaussian_sigma(sensitivity: float, alpha: float, epsilon_bar: float):
+    return np.sqrt(np.array([((sensitivity**2.0) * alpha)/(2.0 * epsilon_bar)])).item()
+
+def search_for_optimal_alpha(epsilon: float, deltas: list[float], alphas: list[float]):
+    optimal_order_for_delta, sigmas_for_delta = {}, {}
+    for delta in deltas:
+        sigmas = [get_renyi_gaussian_sigma(sensitivity=1.0, alpha=alpha, epsilon_bar=get_epsilon_bar_from_epsilon(epsilon=epsilon, delta=delta, alpha=alpha)) for alpha in alphas ]
+        # print(f"Sigmas for delta {delta}: {sigmas}")
+        not_nan_sigmas = [sigma for sigma in sigmas if not np.isnan(sigma)]
+        # print(f"Not nan sigmas for delta {delta}: {not_nan_sigmas}")
+        min_val = min(not_nan_sigmas)
+        # print(f"Min sigma value for delta {delta}: {min_val}")
+        optimal_order = alphas[sigmas.index(min_val)]
+        # print(f"Optimal order for delta {delta}: {optimal_order}")
+        optimal_order_for_delta[delta] = optimal_order
+        sigmas_for_delta[delta] = sigmas
+    #     # optimal_orders_dict[8.0] = optimal_order
+    #     if print_min_sigma:
+    #         print(f'Delta {delta}: \t Minimal sigma value is {min_val} for order {optimal_order}. rdp (epsilon bar) is {get_epsilon_bar_from_epsilon(epsilon=epsilon, delta=delta, alpha=optimal_order)}')
+    #     plt.plot(alphas, sigmas, label=f'delta {delta}');
+    # plt.title(f'RDP values vs. order for epsilon={epsilon}');
+    # plt.legend();
+    # plt.xlabel("Reny'i Orders (alphas)");
+    # plt.ylabel("Noise Multiplier (std/sensitivity)");
+    return sigmas_for_delta, optimal_order_for_delta
 
 def linear_decrease(upper_bound, lower_bound, num_values):
     diff = (upper_bound - lower_bound) / num_values
@@ -92,7 +117,7 @@ def get_decrease_function(args):
 
 def get_varying_sigma_values(q, n_epoch, eps, delta,
                              initial_sigma_factor, final_sigma_factor, decrease_func,
-                             extra_noise_units=0, noise_for_step=0):
+                             extra_noise_units=0, noise_for_step=0, alpha=32):
     assert initial_sigma_factor > final_sigma_factor, "Initial sigma factor must be greater than final sigma factor"
     assert final_sigma_factor > 0, "Final sigma factor must be greater than 0"
 
@@ -103,7 +128,7 @@ def get_varying_sigma_values(q, n_epoch, eps, delta,
     if extra_noise_units > 0:
         steps_to_add = extra_noise_units // noise_for_step
         sigmas[:steps_to_add] = sigmas[:steps_to_add] + noise_for_step
-    accumulated_epsilon_list, accumulated_epsilon_bar_list = calc_privacy_spent_by_sigma(q, eps, delta, sigmas)
+    accumulated_epsilon_list, accumulated_epsilon_bar_list = calc_privacy_spent_by_sigma(q, eps, delta, sigmas, alpha)
     num_epochs_to_reach_eps = len(accumulated_epsilon_list)
     return sigmas[:num_epochs_to_reach_eps], accumulated_epsilon_list, accumulated_epsilon_bar_list, sigma_orig
 
@@ -116,12 +141,41 @@ if __name__ == "__main__":
     batchsize = 256
     n_training = 50000
     n_epoch = 200
-    delta = 1 / n_epoch
+    delta = 1 / n_training
     epsilon = 1
     initial_sigma_factor = 3.2
     final_sigma_factor = 0.4
     sampling_prob = batchsize / n_training
     steps = int(n_epoch / sampling_prob)
+    alphas = list(range(2, 100))
+    sigmas, optimal_orders = search_for_optimal_alpha(epsilon=epsilon, deltas=[delta], alphas=alphas)
+    # not_nan_sigmas = [sigma.item() for sigma in sigmas if not np.isnan(sigma)]
+    # print(f"Not nan sigmas for delta {delta}: {not_nan_sigmas}")
+    # min_val = min(not_nan_sigmas)
+    # print(f"Min sigma value for delta {delta}: {min_v
+    # optimal_order = alphas[sigmas.index(min_val)]
+    np_alphas = np.array(alphas)
+    optimal_order_index = np.argwhere(np_alphas == optimal_orders[delta]).item()
+    print(f'optimal ordr index: {optimal_order_index}')
+    sigma_optimal =  sigmas[delta][optimal_order_index]
+    print(f"Optimal sigma for delta {delta}: {sigma_optimal}")
+    # thirty_two_order = alphas[sigmas[delta].index(32.0)]
+    alphas = [32, 23, 23.1, 23.13, 23.129, 23.1285]
+    for alpha in alphas:
+
+        thirty_two_order_index = np.argwhere(np_alphas == alpha).item()
+        print(f'{alpha}_order index: {thirty_two_order_index}')
+        sigma_suboptimal = sigmas[delta][thirty_two_order_index]
+
+        print(f"{alpha} sigma for delta {delta}: {sigma_suboptimal}")
+
+    #
+    print(f"Optimal orders for (epsilon, delta) ({epsilon}, {delta}): {optimal_orders}")
+
+    #
+    raise Exception("Stop")
+
+
 
     # Plot
     plt.figure(figsize=(10, 6))
@@ -131,37 +185,38 @@ if __name__ == "__main__":
     geometric_decrease_funcs = [partial(geometric_decrease, curvature_exponent=v) for v in curvatures]
     # for decrease_function in [linear_decrease, geometric_decrease, logarithmic_decrease]:
     for decrease_function in [linear_decrease]:
-    # for crv, decrease_function in zip(curvatures, geometric_decrease_funcs):
-    #     for extra_noise_units in [0, 10000]:
-    #         if extra_noise_units == 0:
-    #             continue
-    #         for noise_for_step in [100, 1000]:
+        # for crv, decrease_function in zip(curvatures, geometric_decrease_funcs):
+        #     for extra_noise_units in [0, 10000]:
+        #         if extra_noise_units == 0:
+        #             continue
+        #         for noise_for_step in [100, 1000]:
+        for alpha in alphas:
+            # for decrease_function in [concave_decrease]:
+            sigmas, accumulated_epsilon, accumulated_epsilon_bar, sigma_orig = get_varying_sigma_values(sampling_prob,
+                                                                                                        int(n_epoch), epsilon,
+                                                                                                        delta,
+                                                                                                        initial_sigma_factor=initial_sigma_factor,
+                                                                                                        final_sigma_factor=final_sigma_factor,
+                                                                                                        decrease_func=decrease_function,
+                                                                                                        alpha=alpha
+                                                                                                        )
+            # extra_noise_units=extra_noise_units,
+            # noise_for_step=noise_for_step)
+            # print(f"Decrease Function geometric curvature {crv} extra noise units {extra_noise_units}, {noise_for_step} for step")
+            print(f"Decrease Function {decrease_function.__name__} alpha {alpha}")
+            print('**************************************************')
+            print(f"Number of sigmas: {len(sigmas)}")
+            print(f'First sigma: {sigmas[0]}')
+            print(f"Final sigma: {sigmas[-1]}")
+            print(f'original sigma: {sigma_orig}')
+            sigmas_above_orig = np.array(sigmas) > sigma_orig
+            print(f"Number of sigmas above original sigma: {sum(sigmas_above_orig)}")
+            print(f"Accumulated epsilons: {accumulated_epsilon}")
+            print(f"Accumulated epsilon-bars: {accumulated_epsilon_bar}")
 
-                # for decrease_function in [concave_decrease]:
-                sigmas, accumulated_epsilon, accumulated_epsilon_bar, sigma_orig = get_varying_sigma_values(sampling_prob,
-                                                                                                            int(n_epoch), epsilon,
-                                                                                                            delta,
-                                                                                                            initial_sigma_factor=initial_sigma_factor,
-                                                                                                            final_sigma_factor=final_sigma_factor,
-                                                                                                            decrease_func=decrease_function,
-                                                                                                            )
-                                                                                                            # extra_noise_units=extra_noise_units,
-                                                                                                            # noise_for_step=noise_for_step)
-                # print(f"Decrease Function geometric curvature {crv} extra noise units {extra_noise_units}, {noise_for_step} for step")
-                print(f"Decrease Function {decrease_function.__name__}")
-                print('**************************************************')
-                print(f"Number of sigmas: {len(sigmas)}")
-                print(f'First sigma: {sigmas[0]}')
-                print(f"Final sigma: {sigmas[-1]}")
-                print(f'original sigma: {sigma_orig}')
-                sigmas_above_orig = np.array(sigmas) > sigma_orig
-                print(f"Number of sigmas above original sigma: {sum(sigmas_above_orig)}")
-                print(f"Accumulated epsilons: {accumulated_epsilon}")
-                print(f"Accumulated epsilon-bars: {accumulated_epsilon_bar}")
-
-                # plt.plot(range(len(sigmas)), sigmas, label=f'geometric curvature exponent {crv}')
-                # plt.scatter(range(len(sigmas)), sigmas, label=f'geometric curv exp {crv} extra {extra_noise_units}, {noise_for_step} for step')
-                plt.plot(range(len(sigmas)), sigmas, label=decrease_function.__name__)
+            # plt.plot(range(len(sigmas)), sigmas, label=f'geometric curvature exponent {crv}')
+            # plt.scatter(range(len(sigmas)), sigmas, label=f'geometric curv exp {crv} extra {extra_noise_units}, {noise_for_step} for step')
+            plt.plot(range(len(sigmas)), sigmas, label=f'{decrease_function.__name__}_alpha_{alpha}')
 
     plt.title(f"Sigma factor decrease from {initial_sigma_factor} to {final_sigma_factor}")
     plt.xlabel("Subdivision index")

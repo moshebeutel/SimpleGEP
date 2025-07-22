@@ -13,8 +13,8 @@ from tqdm import tqdm
 def parse_args(description: str):
     parser = argparse.ArgumentParser(description=description)
     project_dir = Path(__file__).resolve().parent
-    model_name = "resnet20"
-    # model_name = 'tiny_cifar_net_16'
+    model_name = 'resnet20'
+    # model_name = 'tiny_cifar_net_4'
     ## general arguments
     parser.add_argument('--dataset', default='cifar10', type=str, help='dataset name')
     parser.add_argument('--data_root', default=project_dir / 'data', type=str, help='dataset directory')

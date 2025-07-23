@@ -8,10 +8,11 @@ from simplegep.dp.grads_proc import GradsProcessor
 from simplegep.dp.dynamic_dp import get_varying_sigma_values, get_decrease_function
 from simplegep.dp.per_sample_grad import pretrain_actions, backward_pass_get_batch_grads
 from simplegep.models.factory import get_model
-from simplegep.models.utils import initialize_weights, count_parameters
+from simplegep.models.utils import initialize_weights, count_parameters, substitute_grads, load_checkpoint, \
+    save_checkpoint
 from simplegep.trainers.loss_function_factory import get_loss_function
 from simplegep.trainers.optimizer_factory import get_optimizer
-from simplegep.utils import eval_model, load_checkpoint, save_checkpoint
+from simplegep.trainers.utils import eval_model
 import wandb
 
 
@@ -43,16 +44,10 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor):
         flat_per_sample_grads = backward_pass_get_batch_grads(batch_loss=loss, net=net)
 
         # perturb grads
-        processed_grads = grads_processor.process_grads(flat_per_sample_grads)
+        processed_grads = grads_processor.process_grads(flat_per_sample_grads).squeeze()
 
         # substitute perturbed grads
-        processed_grads = processed_grads.squeeze()
-        offset = 0
-        for param in net.parameters():
-            numel = param.numel()
-            grad = processed_grads[offset:offset + numel].reshape(param.shape)
-            param.grad = grad.clone().reshape(param.shape)
-            offset += numel
+        substitute_grads(net, processed_grads)
 
         # update net parameters
         optimizer.step()
@@ -75,9 +70,7 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor):
 
 
 def train(args, logger: logging.Logger):
-    logger.info('Starting training')
-    if args.wandb:
-        wandb.init(project='GEP', name=args.sess)
+    logger.info(f'Starting training {__file__}')
 
     net = get_model(args)
     initialize_weights(net)
@@ -90,19 +83,22 @@ def train(args, logger: logging.Logger):
     loss_function = get_loss_function(args.loss_function, reduction=reduction)
     logger.debug(f'loss function set to {args.loss_function} reduction {reduction}')
 
-    optimizer = get_optimizer(args=args, model=net)
-    logger.debug(f'optimizer set to {args.optimizer} lr {args.lr}')
+
 
     best_acc = 0.0
     start_epoch = 0
     checkpoint_name = ''
     if args.resume:
         start_epoch, best_acc, seed, rng_state = load_checkpoint(checkpoint_path=args.checkpoint, net=net,
-                                                                 optimizer=optimizer)
+                                                                 optimizer=None)
         assert args.seed == seed, f'Expected checkpoint seed equals session seed. Got {seed} != {args.seed}'
 
     net, loss_function = pretrain_actions(model=net, loss_func=loss_function)
     logger.debug('model and loss functions prepared for per sample grads')
+    net = net.cuda()
+
+    optimizer = get_optimizer(args=args, model=net)
+    logger.debug(f'optimizer set to {args.optimizer} lr {args.lr}')
 
     train_loader = get_train_loader(root=args.data_root, batchsize=args.batchsize)
     logger.debug(f'train loader created size {len(train_loader)}')
@@ -155,7 +151,6 @@ def train(args, logger: logging.Logger):
 
     num_epochs = min(args.num_epochs - start_epoch, len(sigma_list)) if args.dynamic_noise else args.num_epochs
     assert num_epochs > start_epoch, f'Expected num epochs > start epoch. Got {num_epochs} <= {start_epoch}'
-    net = net.cuda()
     for epoch in range(start_epoch, num_epochs):
         logger.info(f'***** Starting epoch {epoch}  ******')
         train_loss, train_acc = train_epoch(net=net, loss_function=loss_function, optimizer=optimizer,
@@ -165,7 +160,12 @@ def train(args, logger: logging.Logger):
         logger.info(f'Epoch {epoch}/{args.num_epochs} test loss {test_loss:.2f} test accuracy {test_acc:.2f}')
         if test_acc > best_acc:
             best_acc = test_acc
-            checkpoint_name = save_checkpoint(net, test_acc, epoch, args.sess)
+            checkpoint_name = save_checkpoint(net=net,
+                                              optimizer=optimizer,
+                                              acc=test_acc,
+                                              epoch=epoch,
+                                              seed=args.seed,
+                                              sess=args.sess)
             logger.info(f'Best Acc = {best_acc}. Checkpoint {checkpoint_name} saved!')
         if args.wandb:
             wandb.log({'train_loss': train_loss, 'train_acc': train_acc, 'test_loss': test_loss,

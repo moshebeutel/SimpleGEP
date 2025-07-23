@@ -1,8 +1,7 @@
 import logging
 from copy import copy
-
 import numpy as np
-
+from simplegep.data.cifar_loader import get_num_samples
 from simplegep.dp.dp_params import get_dp_params
 from simplegep.dp.dynamic_dp import get_decrease_function, get_varying_sigma_values, get_epsilon_from_epsilon_bar
 from simplegep.trainers.dp_sgd_trainer import train as dp_sgd_train
@@ -25,7 +24,7 @@ def train(args, logger: logging.Logger):
     num_epochs = args.num_epochs
 
     dp_params = get_dp_params(batchsize=args.batchsize,
-                              num_training_samples=50_000,
+                              num_training_samples=get_num_samples(),
                               num_epochs=args.num_epochs,
                               epsilon=args.eps)
 
@@ -69,6 +68,7 @@ def train(args, logger: logging.Logger):
 
     dp_sgd_args.resume = True
     dp_sgd_args.checkpoint = checkpoint_name
+    dp_sgd_args.optimizer = 'adam'
     logger.info('Call DP_SGD train')
     dp_sgd_acc, checkpoint_name = dp_sgd_train(args=dp_sgd_args, logger=logger)
     logger.info(f'dp sgd train ended with acc {dp_sgd_acc}')

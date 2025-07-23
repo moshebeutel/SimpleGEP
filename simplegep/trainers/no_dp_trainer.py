@@ -9,7 +9,7 @@ from simplegep.models.factory import get_model
 from simplegep.models.utils import initialize_weights, count_parameters
 from simplegep.trainers.loss_function_factory import get_loss_function
 from simplegep.trainers.optimizer_factory import get_optimizer
-from simplegep.utils import eval_model
+from simplegep.trainers.utils import eval_model
 
 
 def train_epoch(net, loss_function, optimizer, train_loader):

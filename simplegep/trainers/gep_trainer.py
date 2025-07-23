@@ -15,10 +15,11 @@ from simplegep.dp.dynamic_dp import get_varying_sigma_values, get_decrease_funct
 from simplegep.dp.per_sample_grad import pretrain_actions, backward_pass_get_batch_grads, PublicDataPerSampleGrad
 from simplegep.embeddings.embedder import Embedder
 from simplegep.models.factory import get_model
-from simplegep.models.utils import initialize_weights, count_parameters
+from simplegep.models.utils import initialize_weights, count_parameters, substitute_grads, load_checkpoint, \
+    save_checkpoint
 from simplegep.trainers.loss_function_factory import get_loss_function
 from simplegep.trainers.optimizer_factory import get_optimizer
-from simplegep.utils import eval_model
+from simplegep.trainers.utils import eval_model
 
 
 def train_epoch(net, loss_function, optimizer, train_loader, grads_processor,
@@ -60,15 +61,10 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor,
         embedded_grads = embedder.embed(flat_per_sample_grads)
         processed_embeddings = grads_processor.process_grads(embedded_grads)
         reconstructed_grads = embedder.project_back(processed_embeddings)
+        processed_grads = reconstructed_grads.squeeze()
 
         # substitute perturbed grads
-        processed_grads = reconstructed_grads.squeeze()
-        offset = 0
-        for param in net.parameters():
-            numel = param.numel()
-            grad = processed_grads[offset:offset + numel].reshape(param.shape).to(param.device)
-            param.grad = grad.clone().reshape(param.shape)
-            offset += numel
+        substitute_grads(net, processed_grads)
 
         # update net parameters
         optimizer.step()
@@ -104,11 +100,17 @@ def train(args, logger: logging.Logger):
     loss_function = get_loss_function(args.loss_function, reduction=reduction)
     logger.debug(f'loss function set to {args.loss_function} reduction {reduction}')
 
-    net, loss_function = pretrain_actions(model=net, loss_func=loss_function)
-    logger.debug('model and loss functions prepared for per sample grads')
+    best_acc = 0.0
+    checkpoint_name = ''
+    if args.resume:
+        epoch, best_acc, seed, rng_state = load_checkpoint(checkpoint_path=args.checkpoint, net=net, optimizer=None)
+        assert args.seed == seed, f'Expected checkpoint seed equals session seed. Got {seed} != {args.seed}'
 
     optimizer = get_optimizer(args=args, model=net)
     logger.debug(f'optimizer set to {args.optimizer} lr {args.lr}')
+
+    net, loss_function = pretrain_actions(model=net, loss_func=loss_function)
+    logger.debug('model and loss functions prepared for per sample grads')
 
     train_loader = get_train_loader(root=args.data_root, batchsize=args.batchsize)
     logger.debug(f'train loader created size {len(train_loader)}')
@@ -161,8 +163,8 @@ def train(args, logger: logging.Logger):
 
     num_epochs = min(args.num_epochs, len(sigma_list)) if args.dynamic_noise else args.num_epochs
 
-    lr_shceduler = torch.optim.lr_scheduler.StepLR(step_size=num_epochs//2, optimizer=optimizer, gamma=0.1)
-    logger.debug(f'Initialized lr scheduler step {num_epochs//2} gamma {0.1}')
+    # lr_shceduler = torch.optim.lr_scheduler.StepLR(step_size=num_epochs//2, optimizer=optimizer, gamma=0.1)
+    # logger.debug(f'Initialized lr scheduler step {num_epochs//2} gamma {0.1}')
 
     embedder = embeddings.factory.get_embedder(args)
 
@@ -175,12 +177,12 @@ def train(args, logger: logging.Logger):
 
     logger.debug(f'Created public data with {len(public_inputs)} examples')
 
-    pub_data_grads = PublicDataPerSampleGrad(public_data=(public_inputs, public_targets), net=net)
+    pub_data_grads = PublicDataPerSampleGrad(public_data=(public_inputs, public_targets), net=net,
+                                             public_batchsize=args.batchsize)
 
     logger.debug(f'Created PublicDataPerSampleGrad {pub_data_grads}')
 
     grads_history_container = create_grads_history_container(args, num_params) if args.grads_history_size > 0 else None
-
     net = net.cuda()
     for epoch in range(num_epochs):
         logger.info(f'***** Starting epoch {epoch}  ******')
@@ -191,14 +193,23 @@ def train(args, logger: logging.Logger):
         logger.info(f'Epoch {epoch}/{args.num_epochs} train loss {train_loss:.2f} train accuracy {train_acc:.2f}')
         test_loss, test_acc = eval_model(net=net, loss_function=loss_function, loader=test_loader)
         logger.info(f'Epoch {epoch}/{args.num_epochs} test loss {test_loss:.2f} test accuracy {test_acc:.2f}')
+        if test_acc > best_acc:
+            best_acc = test_acc
+            checkpoint_name = save_checkpoint(net=net, optimizer=optimizer, acc=test_acc,
+                                              epoch=epoch,
+                                              seed=args.seed,
+                                              sess=args.sess)
+            logger.info(f'Best Acc = {best_acc}. Checkpoint {checkpoint_name} saved!')
         if args.wandb:
             wandb.log({'train_loss': train_loss, 'train_acc': train_acc, 'test_loss': test_loss,
-                       'test_acc': test_acc,
+                       'test_acc': test_acc, 'best_acc': best_acc,
                        'sigma': sigma_list[epoch]}, step=epoch)
             if args.dynamic_noise:
                 wandb.log({'accumulated_epsilon': accumulated_epsilon_list[epoch],
                            'accumulated_epsilon_bar': accumulated_epsilon_bar_list[epoch]}, step=epoch)
-        lr_shceduler.step()
+        # lr_shceduler.step()
+    return best_acc, checkpoint_name
+
 
 def get_aux_data(aux_data_root: Path, aux_dataset: str, aux_data_size: int, real_labels: bool):
     ## preparing auxiliary data
@@ -209,7 +220,8 @@ def get_aux_data(aux_data_root: Path, aux_dataset: str, aux_data_size: int, real
                 torchvision.transforms.ToTensor(),
                 torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
             ])
-            testset = torchvision.datasets.CIFAR100(root=aux_data_root, train=False, download=True, transform=transform_test)
+            testset = torchvision.datasets.CIFAR100(root=aux_data_root, train=False, download=True,
+                                                    transform=transform_test)
         public_data_loader = torch.utils.data.DataLoader(testset, batch_size=num_public_examples, shuffle=False,
                                                          num_workers=2)  #
         for public_inputs, public_targets in public_data_loader:

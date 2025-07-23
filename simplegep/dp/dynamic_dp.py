@@ -42,13 +42,17 @@ def calc_privacy_spent_by_sigma(q, eps, delta, sigmas, alpha=32):
 
     return accumulated_epsilon_list, accumulated_epsilon_bar_list
 
+
 def get_renyi_gaussian_sigma(sensitivity: float, alpha: float, epsilon_bar: float):
-    return np.sqrt(np.array([((sensitivity**2.0) * alpha)/(2.0 * epsilon_bar)])).item()
+    return np.sqrt(np.array([((sensitivity ** 2.0) * alpha) / (2.0 * epsilon_bar)])).item()
+
 
 def search_for_optimal_alpha(epsilon: float, deltas: list[float], alphas: list[float]):
     optimal_order_for_delta, sigmas_for_delta = {}, {}
     for delta in deltas:
-        sigmas = [get_renyi_gaussian_sigma(sensitivity=1.0, alpha=alpha, epsilon_bar=get_epsilon_bar_from_epsilon(epsilon=epsilon, delta=delta, alpha=alpha)) for alpha in alphas ]
+        sigmas = [get_renyi_gaussian_sigma(sensitivity=1.0, alpha=alpha,
+                                           epsilon_bar=get_epsilon_bar_from_epsilon(epsilon=epsilon, delta=delta,
+                                                                                    alpha=alpha)) for alpha in alphas]
         # print(f"Sigmas for delta {delta}: {sigmas}")
         not_nan_sigmas = [sigma for sigma in sigmas if not np.isnan(sigma)]
         # print(f"Not nan sigmas for delta {delta}: {not_nan_sigmas}")
@@ -68,6 +72,7 @@ def search_for_optimal_alpha(epsilon: float, deltas: list[float], alphas: list[f
     # plt.ylabel("Noise Multiplier (std/sensitivity)");
     return sigmas_for_delta, optimal_order_for_delta
 
+
 def linear_decrease(upper_bound, lower_bound, num_values):
     diff = (upper_bound - lower_bound) / num_values
     return [upper_bound - diff * i for i in range(num_values)]
@@ -76,6 +81,8 @@ def linear_decrease(upper_bound, lower_bound, num_values):
 def geometric_decrease(upper_bound, lower_bound, num_values):
     factor = (lower_bound / upper_bound) ** (1 / num_values)
     return [upper_bound * factor ** i for i in range(num_values)]
+
+
 # def geometric_decrease(upper_bound, lower_bound, num_values, curvature_exponent=1.0):
 #     base_factor = (lower_bound / upper_bound) ** (1 / num_values)
 #     return [
@@ -106,18 +113,27 @@ def logarithmic_decrease(upper_bound, lower_bound, num_values):
     # return convex_subdivision(upper_bound, lower_bound, num_values, func=funcs[r"$e^x$ (normalized)"])
 
 
+def step_decrease(upper_bound, lower_bound, num_values, upper_ratio=0.84):
+    num_step_upper = int(upper_ratio * num_values)
+    num_step_lower = num_values - num_step_upper
+    sigam_factors = [upper_bound] * num_step_upper + [lower_bound] * num_step_lower
+    return sigam_factors
+
+
 def get_decrease_function(args):
-    get_decrease_function.hub = {'linear': linear_decrease, 'geometric': geometric_decrease,
-                                 'logarithmic': logarithmic_decrease}
-    assert args.decrease_shape in ['linear', 'geometric', 'logarithmic'], (
+    get_decrease_function.hub = {'linear': linear_decrease,
+                                 'geometric': geometric_decrease,
+                                 'logarithmic': logarithmic_decrease,
+                                 'step': step_decrease}
+    assert args.decrease_shape in ['linear', 'geometric', 'logarithmic', 'step'], (
         f"Unknown decrease shape {args.decrease_shape}."
-        f" Expected one of 'linear', 'geometric', 'logarithmic'.")
+        f" Expected one of 'linear', 'geometric', 'logarithmic', 'step'.")
     return get_decrease_function.hub[args.decrease_shape]
 
 
 def get_varying_sigma_values(q, n_epoch, eps, delta,
                              initial_sigma_factor, final_sigma_factor, decrease_func,
-                             extra_noise_units=0, noise_for_step=0, alpha=32):
+                             extra_noise_units=0, noise_for_step=0, alpha=23):
     assert initial_sigma_factor > final_sigma_factor, "Initial sigma factor must be greater than final sigma factor"
     assert final_sigma_factor > 0, "Final sigma factor must be greater than 0"
 
@@ -138,6 +154,7 @@ if __name__ == "__main__":
 
     matplotlib.use('TkAgg')
     import matplotlib.pyplot as plt
+
     batchsize = 256
     n_training = 50000
     n_epoch = 200
@@ -157,12 +174,11 @@ if __name__ == "__main__":
     np_alphas = np.array(alphas)
     optimal_order_index = np.argwhere(np_alphas == optimal_orders[delta]).item()
     print(f'optimal ordr index: {optimal_order_index}')
-    sigma_optimal =  sigmas[delta][optimal_order_index]
+    sigma_optimal = sigmas[delta][optimal_order_index]
     print(f"Optimal sigma for delta {delta}: {sigma_optimal}")
     # thirty_two_order = alphas[sigmas[delta].index(32.0)]
     alphas = [32, 23, 23.1, 23.13, 23.129, 23.1285]
     for alpha in alphas:
-
         thirty_two_order_index = np.argwhere(np_alphas == alpha)
         assert thirty_two_order_index.size <= 1, f"There is more than one index for alpha {alpha}"
         thirty_two_order_index = thirty_two_order_index.item() if thirty_two_order_index.size > 0 else None
@@ -177,8 +193,6 @@ if __name__ == "__main__":
 
     #
     raise Exception("Stop")
-
-
 
     # Plot
     plt.figure(figsize=(10, 6))
@@ -196,7 +210,8 @@ if __name__ == "__main__":
         for alpha in alphas:
             # for decrease_function in [concave_decrease]:
             sigmas, accumulated_epsilon, accumulated_epsilon_bar, sigma_orig = get_varying_sigma_values(sampling_prob,
-                                                                                                        int(n_epoch), epsilon,
+                                                                                                        int(n_epoch),
+                                                                                                        epsilon,
                                                                                                         delta,
                                                                                                         initial_sigma_factor=initial_sigma_factor,
                                                                                                         final_sigma_factor=final_sigma_factor,

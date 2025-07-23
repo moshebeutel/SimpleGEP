@@ -163,9 +163,12 @@ if __name__ == "__main__":
     alphas = [32, 23, 23.1, 23.13, 23.129, 23.1285]
     for alpha in alphas:
 
-        thirty_two_order_index = np.argwhere(np_alphas == alpha).item()
+        thirty_two_order_index = np.argwhere(np_alphas == alpha)
+        assert thirty_two_order_index.size <= 1, f"There is more than one index for alpha {alpha}"
+        thirty_two_order_index = thirty_two_order_index.item() if thirty_two_order_index.size > 0 else None
         print(f'{alpha}_order index: {thirty_two_order_index}')
-        sigma_suboptimal = sigmas[delta][thirty_two_order_index]
+
+        sigma_suboptimal = sigmas[delta][thirty_two_order_index] if thirty_two_order_index is not None else None
 
         print(f"{alpha} sigma for delta {delta}: {sigma_suboptimal}")
 

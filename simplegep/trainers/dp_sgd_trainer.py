@@ -92,6 +92,7 @@ def train(args, logger: logging.Logger):
         start_epoch, best_acc, seed, rng_state = load_checkpoint(checkpoint_path=args.checkpoint, net=net,
                                                                  optimizer=None)
         assert args.seed == seed, f'Expected checkpoint seed equals session seed. Got {seed} != {args.seed}'
+        logger.info(f'Loaded checkpoint {args.checkpoint} with epoch {epoch} best acc {best_acc}')
 
     net, loss_function = pretrain_actions(model=net, loss_func=loss_function)
     logger.debug('model and loss functions prepared for per sample grads')
@@ -141,6 +142,9 @@ def train(args, logger: logging.Logger):
         logger.debug(f'Accumulated epsilon bar list: {accumulated_epsilon_bar_list}')
         logger.debug(f'Sigma orig: {sigma_orig}')
 
+    num_epochs = min(args.num_epochs - start_epoch, len(sigma_list)) if args.dynamic_noise else args.num_epochs
+    assert num_epochs > start_epoch, f'Expected num epochs > start epoch. Got {num_epochs} <= {start_epoch}'
+
     grads_processor = GradsProcessor(clip_strategy_name=args.clip_strategy,
                                      noise_multiplier=sigma_list,
                                      clip_value=args.clip_value)
@@ -149,8 +153,6 @@ def train(args, logger: logging.Logger):
                  f'noise multiplier {dp_params.sigma}'
                  f' clip value {args.clip_value}')
 
-    num_epochs = min(args.num_epochs - start_epoch, len(sigma_list)) if args.dynamic_noise else args.num_epochs
-    assert num_epochs > start_epoch, f'Expected num epochs > start epoch. Got {num_epochs} <= {start_epoch}'
     for epoch in range(start_epoch, num_epochs):
         logger.info(f'***** Starting epoch {epoch}  ******')
         train_loss, train_acc = train_epoch(net=net, loss_function=loss_function, optimizer=optimizer,

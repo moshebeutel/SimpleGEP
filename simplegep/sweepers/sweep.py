@@ -52,7 +52,7 @@ def main(args):
             "embedder": {"values": ["svd"]},
             "dynamic_noise": {"values": [True]},
             "dynamic_noise_high_factor": {"values": [3.2]},
-            "dynamic_noise_low_factor": {"values": [0.4]},
+            "dynamic_noise_low_factor": {"values": [0.56]},
             "decrease_shape": {"values": ["step"]},
             "num_epochs": {"values": [200]},
             # "stop_embedding_epoch": {"values": [100]},

@@ -101,16 +101,20 @@ def train(args, logger: logging.Logger):
     logger.debug(f'loss function set to {args.loss_function} reduction {reduction}')
 
     best_acc = 0.0
+    start_epoch = 0
     checkpoint_name = ''
     if args.resume:
-        epoch, best_acc, seed, rng_state = load_checkpoint(checkpoint_path=args.checkpoint, net=net, optimizer=None)
+        start_epoch, best_acc, seed, rng_state = load_checkpoint(checkpoint_path=args.checkpoint, net=net, optimizer=None)
         assert args.seed == seed, f'Expected checkpoint seed equals session seed. Got {seed} != {args.seed}'
+        logger.info(f'Loaded checkpoint {args.checkpoint} with epoch {start_epoch} best acc {best_acc}')
+
+    net, loss_function = pretrain_actions(model=net, loss_func=loss_function)
+    logger.debug('model and loss functions prepared for per sample grads')
+    net = net.cuda()
 
     optimizer = get_optimizer(args=args, model=net)
     logger.debug(f'optimizer set to {args.optimizer} lr {args.lr}')
 
-    net, loss_function = pretrain_actions(model=net, loss_func=loss_function)
-    logger.debug('model and loss functions prepared for per sample grads')
 
     train_loader = get_train_loader(root=args.data_root, batchsize=args.batchsize)
     logger.debug(f'train loader created size {len(train_loader)}')
@@ -153,6 +157,9 @@ def train(args, logger: logging.Logger):
         logger.debug(f'Accumulated epsilon bar list: {accumulated_epsilon_bar_list}')
         logger.debug(f'Sigma orig: {sigma_orig}')
 
+    num_epochs = min(args.num_epochs, len(sigma_list)) if args.dynamic_noise else args.num_epochs
+    assert num_epochs > start_epoch, f'Expected num epochs > start epoch. Got {num_epochs} <= {start_epoch}'
+
     grads_processor = GradsProcessor(clip_strategy_name=args.clip_strategy,
                                      noise_multiplier=dp_params.sigma,
                                      clip_value=args.clip_value)
@@ -161,7 +168,6 @@ def train(args, logger: logging.Logger):
                  f'noise multiplier {dp_params.sigma}'
                  f' clip value {args.clip_value}')
 
-    num_epochs = min(args.num_epochs, len(sigma_list)) if args.dynamic_noise else args.num_epochs
 
     # lr_shceduler = torch.optim.lr_scheduler.StepLR(step_size=num_epochs//2, optimizer=optimizer, gamma=0.1)
     # logger.debug(f'Initialized lr scheduler step {num_epochs//2} gamma {0.1}')
@@ -183,8 +189,8 @@ def train(args, logger: logging.Logger):
     logger.debug(f'Created PublicDataPerSampleGrad {pub_data_grads}')
 
     grads_history_container = create_grads_history_container(args, num_params) if args.grads_history_size > 0 else None
-    net = net.cuda()
-    for epoch in range(num_epochs):
+
+    for epoch in range(start_epoch, num_epochs):
         logger.info(f'***** Starting epoch {epoch}  ******')
         train_loss, train_acc = train_epoch(net=net, loss_function=loss_function, optimizer=optimizer,
                                             train_loader=train_loader, grads_processor=grads_processor,

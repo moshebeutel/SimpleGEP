@@ -156,58 +156,59 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     batchsize = 256
-    n_training = 50000
+    n_training = 50_000
     n_epoch = 200
     delta = 1 / n_training
-    epsilon = 1
+    epsilon = 8
     initial_sigma_factor = 3.2
-    final_sigma_factor = 0.4
+    final_sigma_factor = 0.56
     sampling_prob = batchsize / n_training
     steps = int(n_epoch / sampling_prob)
     alphas = list(range(2, 100))
-    sigmas, optimal_orders = search_for_optimal_alpha(epsilon=epsilon, deltas=[delta], alphas=alphas)
+    # sigmas, optimal_orders = search_for_optimal_alpha(epsilon=epsilon, deltas=[delta], alphas=alphas)
     # not_nan_sigmas = [sigma.item() for sigma in sigmas if not np.isnan(sigma)]
     # print(f"Not nan sigmas for delta {delta}: {not_nan_sigmas}")
     # min_val = min(not_nan_sigmas)
     # print(f"Min sigma value for delta {delta}: {min_v
     # optimal_order = alphas[sigmas.index(min_val)]
-    np_alphas = np.array(alphas)
-    optimal_order_index = np.argwhere(np_alphas == optimal_orders[delta]).item()
-    print(f'optimal ordr index: {optimal_order_index}')
-    sigma_optimal = sigmas[delta][optimal_order_index]
-    print(f"Optimal sigma for delta {delta}: {sigma_optimal}")
+    # np_alphas = np.array(alphas)
+    # optimal_order_index = np.argwhere(np_alphas == optimal_orders[delta]).item()
+    # print(f'optimal ordr index: {optimal_order_index}')
+    # sigma_optimal = sigmas[delta][optimal_order_index]
+    # print(f"Optimal sigma for delta {delta}: {sigma_optimal}")
     # thirty_two_order = alphas[sigmas[delta].index(32.0)]
-    alphas = [32, 23, 23.1, 23.13, 23.129, 23.1285]
-    for alpha in alphas:
-        thirty_two_order_index = np.argwhere(np_alphas == alpha)
-        assert thirty_two_order_index.size <= 1, f"There is more than one index for alpha {alpha}"
-        thirty_two_order_index = thirty_two_order_index.item() if thirty_two_order_index.size > 0 else None
-        print(f'{alpha}_order index: {thirty_two_order_index}')
-
-        sigma_suboptimal = sigmas[delta][thirty_two_order_index] if thirty_two_order_index is not None else None
-
-        print(f"{alpha} sigma for delta {delta}: {sigma_suboptimal}")
-
+    # alphas = [32, 23, 23.1, 23.13, 23.129, 23.1285]
+    # for alpha in alphas:
+    #     thirty_two_order_index = np.argwhere(np_alphas == alpha)
+    #     assert thirty_two_order_index.size <= 1, f"There is more than one index for alpha {alpha}"
+    #     thirty_two_order_index = thirty_two_order_index.item() if thirty_two_order_index.size > 0 else None
+    #     print(f'{alpha}_order index: {thirty_two_order_index}')
     #
-    print(f"Optimal orders for (epsilon, delta) ({epsilon}, {delta}): {optimal_orders}")
-
+    #     sigma_suboptimal = sigmas[delta][thirty_two_order_index] if thirty_two_order_index is not None else None
     #
-    raise Exception("Stop")
+    #     print(f"{alpha} sigma for delta {delta}: {sigma_suboptimal}")
+    #
+    # #
+    # print(f"Optimal orders for (epsilon, delta) ({epsilon}, {delta}): {optimal_orders}")
+    #
+    # #
+    # raise Exception("Stop")
 
     # Plot
     plt.figure(figsize=(10, 6))
 
-    curvatures = [0.5, 1.0]
+    # curvatures = [0.5, 1.0]
     # curvatures = [1.0, 0.8,  1.1]
-    geometric_decrease_funcs = [partial(geometric_decrease, curvature_exponent=v) for v in curvatures]
+    # geometric_decrease_funcs = [partial(geometric_decrease, curvature_exponent=v) for v in curvatures]
     # for decrease_function in [linear_decrease, geometric_decrease, logarithmic_decrease]:
-    for decrease_function in [linear_decrease]:
+    # for decrease_function in [linear_decrease]:
+    for decrease_function in [step_decrease]:
         # for crv, decrease_function in zip(curvatures, geometric_decrease_funcs):
         #     for extra_noise_units in [0, 10000]:
         #         if extra_noise_units == 0:
         #             continue
         #         for noise_for_step in [100, 1000]:
-        for alpha in alphas:
+        for alpha in [23, 32]:
             # for decrease_function in [concave_decrease]:
             sigmas, accumulated_epsilon, accumulated_epsilon_bar, sigma_orig = get_varying_sigma_values(sampling_prob,
                                                                                                         int(n_epoch),
@@ -240,7 +241,7 @@ if __name__ == "__main__":
     plt.xlabel("Subdivision index")
     plt.ylabel("Value")
     plt.xlim(0, 201)
-    plt.ylim(0, 50)
+    plt.ylim(0, 10)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()

@@ -50,16 +50,16 @@ def main(args):
             "weight_decay": {"values": [1e-4]},
             "filters": {"values": [4]},
             "embedder": {"values": ["svd"]},
-            "dynamic_noise": {"values": [False, True]},
+            "dynamic_noise": {"values": [True]},
             "dynamic_noise_high_factor": {"values": [3.2]},
             "dynamic_noise_low_factor": {"values": [0.4]},
-            "decrease_shape": {"values": ["linear"]},
+            "decrease_shape": {"values": ["step"]},
             "num_epochs": {"values": [200]},
             # "stop_embedding_epoch": {"values": [100]},
             "num_basis": {"values": [2000]},
             "grads_history_size": {"values": [2000]},
             "aux_data_size": {"values": [2000]},
-            "batchsize": {"values": [128]}
+            "batchsize": {"values": [256]}
     }
 
     dynamic_noise_parameters = {
@@ -96,7 +96,7 @@ def main(args):
 
 
     sweep_configuration = {
-        "name": f"{args.dp_method.upper()}_SEED_{args.seed}_TINY_EPS_{args.eps}",
+        "name": f"{args.dp_method.upper()}_SEED_{args.seed}_{args.model_name.upper()}_EPS_{args.eps}",
         "method": "grid",
         "metric": {"goal": "maximize", "name": "test_acc"},
         "parameters": {
@@ -120,7 +120,15 @@ if __name__ == '__main__':
 
     if args.dp_method == 'gep':
         from simplegep.trainers.gep_trainer import train
-    else:
-        assert args.dp_method == 'dp_sgd'
+    elif args.dp_method == 'dp_sgs':
         from simplegep.trainers.dp_sgd_trainer import train
+    elif args.dp_method == 'super':
+        from simplegep.trainers.super_trainer import train
+
+        args.dynamic_noise = True
+        args.decrease_shape = 'step'
+    else:
+        assert args.dp_method == 'no_dp', f'dp_method {args.dp_method} unknown'
+        from simplegep.trainers.no_dp_trainer import train
+
     main(args)

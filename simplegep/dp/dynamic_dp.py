@@ -133,7 +133,7 @@ def get_decrease_function(args):
 
 def get_varying_sigma_values(q, n_epoch, eps, delta,
                              initial_sigma_factor, final_sigma_factor, decrease_func,
-                             extra_noise_units=0, noise_for_step=0, alpha=23):
+                             extra_noise_units=0, noise_for_step=0, alpha=32):
     assert initial_sigma_factor > final_sigma_factor, "Initial sigma factor must be greater than final sigma factor"
     assert final_sigma_factor > 0, "Final sigma factor must be greater than 0"
 

@@ -15,20 +15,20 @@ def analyze_step(values: list):
     switch_index = uniq.counts[1]
     assert values[switch_index - 1] == values[0]
     assert values[switch_index] == values[-1]
-    return switch_index
+    return switch_index, uniq.values, uniq.counts
 
 
 def train(args, logger: logging.Logger):
     logger.info('Super trainer start')
 
     num_epochs = args.num_epochs
-
+    logger.debug(f'num epochs {num_epochs}')
     dp_params = get_dp_params(batchsize=args.batchsize,
                               num_training_samples=get_num_samples(),
                               num_epochs=args.num_epochs,
                               epsilon=args.eps)
-
-    assert args.dynamic_noise
+    logger.debug(f'Super trainer DP params set: {dp_params}')
+    assert args.dynamic_noise, f'Expected dynamic noise to be set for super trainer. Got {args.dynamic_noise} != True'
     sigma_decrease_function = get_decrease_function(args)
     logger.debug(f'Using decrease function {sigma_decrease_function.__name__}')
     sigma_list, accumulated_epsilon_list, accumulated_epsilon_bar_list, sigma_orig = (
@@ -38,9 +38,10 @@ def train(args, logger: logging.Logger):
                                  initial_sigma_factor=args.dynamic_noise_high_factor,
                                  final_sigma_factor=args.dynamic_noise_low_factor,
                                  decrease_func=sigma_decrease_function, ))
-
-    switch_trains_epoch = analyze_step(sigma_list)
-    assert len(sigma_list) > switch_trains_epoch
+    logger.debug(f'Created varying sigma list with {len(sigma_list)} values')
+    switch_trains_epoch, values, counts = analyze_step(sigma_list)
+    logger.debug(f'switch trains epoch {switch_trains_epoch} values {values} counts {counts}')
+    assert len(sigma_list) > switch_trains_epoch, f'Expected sigma list to have more sigmas than switch trains epoch. '
     assert switch_trains_epoch < num_epochs, f'Expected switch train epoch before num_epochs.' \
                                              f' Got switch epoch {switch_trains_epoch} num epochs {num_epochs}'
 
@@ -69,6 +70,7 @@ def train(args, logger: logging.Logger):
     dp_sgd_args.resume = True
     dp_sgd_args.checkpoint = checkpoint_name
     dp_sgd_args.optimizer = 'adam'
+    dp_sgd_args.lr = 1e-3
     logger.info('Call DP_SGD train')
     dp_sgd_acc, checkpoint_name = dp_sgd_train(args=dp_sgd_args, logger=logger)
     logger.info(f'dp sgd train ended with acc {dp_sgd_acc}')

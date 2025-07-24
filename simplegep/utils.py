@@ -36,9 +36,9 @@ def parse_args(description: str):
                         help='Differential privacy method: dp_sgd, gep, no dp, super. Default: dp_sgd.')
     parser.add_argument('--private', '-p', action='store_true', help='enable differential privacy')
     parser.add_argument('--dynamic_noise', action='store_true', help='varying noise levels for each epoch')
-    parser.add_argument('--dynamic_noise_high_factor', default=20, type=float,
+    parser.add_argument('--dynamic_noise_high_factor', default=3.2, type=float,
                         help='highest noise factor for varying mechanism')
-    parser.add_argument('--dynamic_noise_low_factor', default=0.5, type=float,
+    parser.add_argument('--dynamic_noise_low_factor', default=0.4, type=float,
                         help='lowest noise factor for varying mechanism')
     parser.add_argument('--decrease_shape', default='step', type=str,
                         choices=['linear', 'geometric', 'logarithmic', 'step'])

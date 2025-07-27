@@ -92,7 +92,7 @@ def train(args, logger: logging.Logger):
         start_epoch, best_acc, seed, rng_state = load_checkpoint(checkpoint_path=args.checkpoint, net=net,
                                                                  optimizer=None)
         assert args.seed == seed, f'Expected checkpoint seed equals session seed. Got {seed} != {args.seed}'
-        logger.info(f'Loaded checkpoint {args.checkpoint} with epoch {epoch} best acc {best_acc}')
+        logger.info(f'Loaded checkpoint {args.checkpoint} with epoch {start_epoch} best acc {best_acc}')
 
     net, loss_function = pretrain_actions(model=net, loss_func=loss_function)
     logger.debug('model and loss functions prepared for per sample grads')

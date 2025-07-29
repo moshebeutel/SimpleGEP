@@ -40,7 +40,7 @@ def main(args):
     logger.info(f'Arguments: {args}')
 
     default_parameters = {
-            "lr": {"values": [1e-4]},
+            "lr": {"values": [5e-4, 1e-3]},
             "seed": {"values": [3]},
             "clip_value": {"values": [35.0]},
             "clip_strategy": {"values": ["value"]},
@@ -52,14 +52,14 @@ def main(args):
             "embedder": {"values": ["svd"]},
             "dynamic_noise": {"values": [True]},
             "dynamic_noise_high_factor": {"values": [3.2]},
-            "dynamic_noise_low_factor": {"values": [0.56]},
+            "dynamic_noise_low_factor": {"values": [0.61]},
             "decrease_shape": {"values": ["step"]},
             "num_epochs": {"values": [200]},
             # "stop_embedding_epoch": {"values": [100]},
             "num_basis": {"values": [2000]},
             "grads_history_size": {"values": [2000]},
             "aux_data_size": {"values": [2000]},
-            "batchsize": {"values": [256]}
+            "batchsize": {"values": [32]}
     }
 
     dynamic_noise_parameters = {

@@ -155,13 +155,13 @@ if __name__ == "__main__":
     matplotlib.use('TkAgg')
     import matplotlib.pyplot as plt
 
-    batchsize = 256
+    batchsize = 32
     n_training = 50_000
     n_epoch = 200
     delta = 1 / n_training
     epsilon = 8
     initial_sigma_factor = 3.2
-    final_sigma_factor = 0.56
+    final_sigma_factor = 0.61
     sampling_prob = batchsize / n_training
     steps = int(n_epoch / sampling_prob)
     alphas = list(range(2, 100))

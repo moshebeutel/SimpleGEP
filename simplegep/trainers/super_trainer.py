@@ -69,7 +69,7 @@ def train(args, logger: logging.Logger):
 
     dp_sgd_args.resume = True
     dp_sgd_args.checkpoint = checkpoint_name
-    dp_sgd_args.optimizer = 'adam'
+    dp_sgd_args.optimizer = 'sgd'
     dp_sgd_args.lr = 1e-3
     logger.info('Call DP_SGD train')
     dp_sgd_acc, checkpoint_name = dp_sgd_train(args=dp_sgd_args, logger=logger)

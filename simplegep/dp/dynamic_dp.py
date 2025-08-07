@@ -33,10 +33,10 @@ def calc_privacy_spent_by_sigma(q, eps, delta, sigmas, alpha=32):
         epsilon, epsilon_bar = privacy_budget_left(q, steps_in_epoch, sigma, delta)
         accumulated_epsilon_bar += epsilon_bar
         accumulated_epsilon = get_epsilon_from_epsilon_bar(accumulated_epsilon_bar, alpha, delta)
-        pbar.set_description(
-            f"accumulated epsilon: {accumulated_epsilon} accumulated epsilon bar: {accumulated_epsilon_bar}")
         if accumulated_epsilon > eps:
             break
+        pbar.set_description(
+            f"accumulated epsilon: {accumulated_epsilon} accumulated epsilon bar: {accumulated_epsilon_bar}")
         accumulated_epsilon_list.append(float(accumulated_epsilon))
         accumulated_epsilon_bar_list.append(float(accumulated_epsilon_bar))
 
@@ -155,16 +155,82 @@ if __name__ == "__main__":
     matplotlib.use('TkAgg')
     import matplotlib.pyplot as plt
 
-    batchsize = 256
+    batchsize = 1000
     n_training = 50_000
-    n_epoch = 200
+    # n_epoch = 200
     delta = 1 / n_training
     epsilon = 8
-    initial_sigma_factor = 3.2
-    final_sigma_factor = 0.56
+    # initial_sigma_factor = 1.0
+    # final_sigma_factor = 0.3
+    # # final_sigma_factor = 0.64
+    sampling_prob = batchsize / n_training
+    # steps = int(n_epoch / sampling_prob)
+    # alphas = list(range(2, 100))
+    alpha = 23   # 32
+
+    base_sigma = 1.53
+    switch_epoch = 128
+    sigmas = [base_sigma] * switch_epoch
+    accumulated_epsilon_list, accumulated_epsilon_bar_list = calc_privacy_spent_by_sigma(q = sampling_prob,
+                                                                                         eps = epsilon,
+                                                                                         delta = delta,
+                                                                                         sigmas = sigmas,
+                                                                                         alpha = alpha)
+    print(f"Accumulated epsilon list: {accumulated_epsilon_list}")
+    print(f"Accumulated epsilon bar list: {accumulated_epsilon_bar_list}")
+    print(f"Final epsilon: {accumulated_epsilon_list[-1]}")
+    print(f"Final epsilon bar: {accumulated_epsilon_bar_list[-1]}")
+    total_renyi_budget = get_epsilon_bar_from_epsilon(epsilon=epsilon, alpha=alpha, delta=delta)
+    print(f"Total RDP budget: {total_renyi_budget}")
+    left_renyi_budget = total_renyi_budget - accumulated_epsilon_bar_list[-1]
+    print(f"Left RDP budget: {left_renyi_budget}")
+    left_eps = get_epsilon_from_epsilon_bar(left_renyi_budget, alpha=alpha, delta=delta)
+
+    batchsize = 256
+    n_training = 50_000
+    n_epoch = 200 - 128
+    delta = 1 / n_training
+    # epsilon = left_eps
+    initial_sigma_factor = 1.0
+    final_sigma_factor = 0.3
+    # final_sigma_factor = 0.64
     sampling_prob = batchsize / n_training
     steps = int(n_epoch / sampling_prob)
     alphas = list(range(2, 100))
+
+    sigmas, accumulated_epsilon, accumulated_epsilon_bar, sigma_orig = get_varying_sigma_values(sampling_prob,
+                                                                                                int(n_epoch),
+                                                                                                eps = epsilon,
+                                                                                                delta = delta,
+                                                                                                initial_sigma_factor=initial_sigma_factor,
+                                                                                                final_sigma_factor=final_sigma_factor,
+                                                                                                decrease_func=linear_decrease,
+                                                                                                alpha=alpha)
+    print(f"accumulated epsilon bar: {accumulated_epsilon_bar}")
+    print(f'accumulated epsilon: {accumulated_epsilon}')
+    print(f'sigmas: {sigmas}')
+    print(f"Number of sigmas: {len(sigmas)}")
+    sigmas_above_orig = np.array(sigmas) > sigma_orig
+    num_sigmas_above_orig = sum(sigmas_above_orig)
+    print(f"Number of sigmas above original sigma: {num_sigmas_above_orig}")
+    sigmas = [base_sigma] * switch_epoch + sigmas[:num_sigmas_above_orig].tolist()
+    print(f"Number of sigmas: {len(sigmas)}")
+
+    accumulated_epsilon_list, accumulated_epsilon_bar_list = calc_privacy_spent_by_sigma(q=sampling_prob,
+                                                                                         eps=epsilon,
+                                                                                         delta=delta,
+                                                                                         sigmas=sigmas,
+                                                                                         alpha=alpha)
+
+
+    print(f"Accumulated epsilon list: {accumulated_epsilon_list}")
+    print(f"Accumulated epsilon bar list: {accumulated_epsilon_bar_list}")
+    print(f"Final epsilon: {accumulated_epsilon_list[-1]}")
+    print(f"Final epsilon bar: {accumulated_epsilon_bar_list[-1]}")
+
+    raise Exception("Stop")
+
+
     # sigmas, optimal_orders = search_for_optimal_alpha(epsilon=epsilon, deltas=[delta], alphas=alphas)
     # not_nan_sigmas = [sigma.item() for sigma in sigmas if not np.isnan(sigma)]
     # print(f"Not nan sigmas for delta {delta}: {not_nan_sigmas}")
@@ -232,6 +298,8 @@ if __name__ == "__main__":
             print(f"Number of sigmas above original sigma: {sum(sigmas_above_orig)}")
             print(f"Accumulated epsilons: {accumulated_epsilon}")
             print(f"Accumulated epsilon-bars: {accumulated_epsilon_bar}")
+            print(f'Accumulated epsilon bar: {accumulated_epsilon_bar[-1]}')
+            print(f'Accumulated epsilon    : {accumulated_epsilon[-1]}')
 
             # plt.plot(range(len(sigmas)), sigmas, label=f'geometric curvature exponent {crv}')
             # plt.scatter(range(len(sigmas)), sigmas, label=f'geometric curv exp {crv} extra {extra_noise_units}, {noise_for_step} for step')

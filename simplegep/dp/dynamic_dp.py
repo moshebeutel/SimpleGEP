@@ -2,7 +2,7 @@ import math
 from functools import partial
 
 import numpy as np
-from tqdm import trange
+from tqdm import trange, tqdm
 from simplegep.dp.rdp_accountant import compute_rdp, get_privacy_spent, get_sigma
 
 
@@ -23,6 +23,25 @@ def privacy_budget_left(sampling_prob, steps, cur_sigma, delta, rdp_orders=32):
     # print(f"epsilon_bar: {epsilon_bar}")
     return float(cur_eps), epsilon_bar
 
+def calc_privacy_spent_by_sigmas_and_probs(qlist: list[float], eps: float, delta, sigmas, alpha=32):
+    assert len(qlist) == len(sigmas), (f'Expected qlist and sigmas to have the same length,'
+                                       f' but got {len(qlist)} and {len(sigmas)} respectively.')
+    accumulated_epsilon_bar, accumulated_epsilon = 0.0, 0.0
+    accumulated_epsilon_bar_list, accumulated_epsilon_list = [], []
+    steps_in_epoch = [int(1 / q) for q in qlist]
+    pbar = tqdm(zip(sigmas, qlist), total=len(sigmas))
+    for sigma, q in pbar:
+        epsilon, epsilon_bar = privacy_budget_left(q, steps_in_epoch, sigma, delta)
+        accumulated_epsilon_bar += epsilon_bar
+        accumulated_epsilon = get_epsilon_from_epsilon_bar(accumulated_epsilon_bar, alpha, delta)
+        if accumulated_epsilon > eps:
+            break
+        pbar.set_description(
+            f"accumulated epsilon: {accumulated_epsilon} accumulated epsilon bar: {accumulated_epsilon_bar}")
+        accumulated_epsilon_list.append(float(accumulated_epsilon))
+        accumulated_epsilon_bar_list.append(float(accumulated_epsilon_bar))
+
+    return accumulated_epsilon_list, accumulated_epsilon_bar_list
 
 def calc_privacy_spent_by_sigma(q, eps, delta, sigmas, alpha=32):
     accumulated_epsilon_bar, accumulated_epsilon = 0.0, 0.0
@@ -155,18 +174,23 @@ if __name__ == "__main__":
     matplotlib.use('TkAgg')
     import matplotlib.pyplot as plt
 
-    batchsize = 1000
+    batchsize = 1024
     n_training = 50_000
-    # n_epoch = 200
+    n_epoch = 200
     delta = 1 / n_training
     epsilon = 8
     # initial_sigma_factor = 1.0
     # final_sigma_factor = 0.3
     # # final_sigma_factor = 0.64
     sampling_prob = batchsize / n_training
-    # steps = int(n_epoch / sampling_prob)
+    first_sampling_prob = sampling_prob
+    steps = int(n_epoch / sampling_prob)
     # alphas = list(range(2, 100))
-    alpha = 23   # 32
+    alpha = 32   # 32
+
+    cur_sigma, previous_eps = get_sigma(q=sampling_prob, T=steps, eps=epsilon, delta=delta)
+    print(f"cur sigma: {cur_sigma}")
+    print(f"previous eps: {previous_eps}")
 
     base_sigma = 1.53
     switch_epoch = 128
@@ -195,6 +219,7 @@ if __name__ == "__main__":
     final_sigma_factor = 0.3
     # final_sigma_factor = 0.64
     sampling_prob = batchsize / n_training
+    second_sampling_prob = sampling_prob
     steps = int(n_epoch / sampling_prob)
     alphas = list(range(2, 100))
 
@@ -213,7 +238,8 @@ if __name__ == "__main__":
     sigmas_above_orig = np.array(sigmas) > sigma_orig
     num_sigmas_above_orig = sum(sigmas_above_orig)
     print(f"Number of sigmas above original sigma: {num_sigmas_above_orig}")
-    sigmas = [base_sigma] * switch_epoch + sigmas[:num_sigmas_above_orig].tolist()
+    sigmas = [base_sigma] * switch_epoch + sigmas.tolist()
+    qlist = [first_sampling_prob] * switch_epoch + [second_sampling_prob] * (len(sigmas) - switch_epoch)
     print(f"Number of sigmas: {len(sigmas)}")
 
     accumulated_epsilon_list, accumulated_epsilon_bar_list = calc_privacy_spent_by_sigma(q=sampling_prob,

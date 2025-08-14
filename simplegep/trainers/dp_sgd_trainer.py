@@ -130,7 +130,8 @@ def train(args, logger: logging.Logger):
         logger.debug(f'Using decrease function {sigma_decrease_function.__name__}')
         sigma_list, accumulated_epsilon_list, accumulated_epsilon_bar_list, sigma_orig = (
             get_varying_sigma_values(q=dp_params.sampling_prob,
-                                     n_epoch=args.num_epochs,
+                                     n_epoch=args.num_epochs - start_epoch,
+                                     # n_epoch=args.num_epochs,
                                      eps=args.eps, delta=dp_params.delta,
                                      initial_sigma_factor=args.dynamic_noise_high_factor,
                                      final_sigma_factor=args.dynamic_noise_low_factor,
@@ -142,8 +143,10 @@ def train(args, logger: logging.Logger):
         logger.debug(f'Accumulated epsilon bar list: {accumulated_epsilon_bar_list}')
         logger.debug(f'Sigma orig: {sigma_orig}')
 
-    num_epochs = min(args.num_epochs - start_epoch, len(sigma_list)) if args.dynamic_noise else args.num_epochs
-    assert num_epochs > start_epoch, f'Expected num epochs > start epoch. Got {num_epochs} <= {start_epoch}'
+    assert args.num_epochs > start_epoch, f'Expected num epochs > start epoch. Got {args.num_epochs} <= {start_epoch}'
+    num_epochs = min(args.num_epochs, start_epoch + len(sigma_list)) if args.dynamic_noise else args.num_epochs
+    # num_epochs = min(args.num_epochs - start_epoch, len(sigma_list)) if args.dynamic_noise else args.num_epochs
+    # assert num_epochs > start_epoch, f'Expected num epochs > start epoch. Got {num_epochs} <= {start_epoch}'
 
     grads_processor = GradsProcessor(clip_strategy_name=args.clip_strategy,
                                      noise_multiplier=sigma_list,
@@ -171,8 +174,15 @@ def train(args, logger: logging.Logger):
             logger.info(f'Best Acc = {best_acc}. Checkpoint {checkpoint_name} saved!')
         if args.wandb:
             wandb.log({'train_loss': train_loss, 'train_acc': train_acc, 'test_loss': test_loss,
-                       'test_acc': test_acc, 'sigma': sigma_list[epoch]}, step=epoch)
+                       'test_acc': test_acc, 'best_acc': best_acc,
+                       'sigma': sigma_list[epoch-start_epoch]}, step=epoch)
             if args.dynamic_noise:
-                wandb.log({'accumulated_epsilon': accumulated_epsilon_list[epoch],
-                           'accumulated_epsilon_bar': accumulated_epsilon_bar_list[epoch]}, step=epoch)
+                wandb.log({'accumulated_epsilon': accumulated_epsilon_list[epoch-start_epoch],
+                           'accumulated_epsilon_bar': accumulated_epsilon_bar_list[epoch-start_epoch]}, step=epoch)
+            # if args.wandb:
+            #     wandb.log({'train_loss': train_loss, 'train_acc': train_acc, 'test_loss': test_loss,
+            #                'test_acc': test_acc, 'sigma': sigma_list[epoch]}, step=epoch)
+            #     if args.dynamic_noise:
+            #         wandb.log({'accumulated_epsilon': accumulated_epsilon_list[epoch],
+            #                    'accumulated_epsilon_bar': accumulated_epsilon_bar_list[epoch]}, step=epoch)
     return best_acc, checkpoint_name

@@ -40,26 +40,26 @@ def main(args):
     logger.info(f'Arguments: {args}')
 
     default_parameters = {
-            "lr": {"values": [5e-4, 1e-3]},
+            "lr": {"values": [1e-4, 1e-3, 1e-5]},
             "seed": {"values": [3]},
             "clip_value": {"values": [35.0]},
             "clip_strategy": {"values": ["value"]},
             "eps": {"values": [args.eps]},
-            "optimizer": {"values": ["adam"]},
+            "optimizer": {"values": ["sgd"]},
             "momentum": {"values": [0.9]},
             "weight_decay": {"values": [1e-4]},
             "filters": {"values": [4]},
             "embedder": {"values": ["svd"]},
             "dynamic_noise": {"values": [True]},
             "dynamic_noise_high_factor": {"values": [3.2]},
-            "dynamic_noise_low_factor": {"values": [0.61]},
-            "decrease_shape": {"values": ["step"]},
+            "dynamic_noise_low_factor": {"values": [0.3]},
+            "decrease_shape": {"values": ["linear"]},
             "num_epochs": {"values": [200]},
             # "stop_embedding_epoch": {"values": [100]},
             "num_basis": {"values": [2000]},
             "grads_history_size": {"values": [2000]},
             "aux_data_size": {"values": [2000]},
-            "batchsize": {"values": [32]}
+            "batchsize": {"values": [256]}
     }
 
     dynamic_noise_parameters = {
@@ -120,7 +120,7 @@ if __name__ == '__main__':
 
     if args.dp_method == 'gep':
         from simplegep.trainers.gep_trainer import train
-    elif args.dp_method == 'dp_sgs':
+    elif args.dp_method == 'dp_sgd':
         from simplegep.trainers.dp_sgd_trainer import train
     elif args.dp_method == 'super':
         from simplegep.trainers.super_trainer import train

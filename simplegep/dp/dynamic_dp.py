@@ -1,5 +1,6 @@
 import math
 from functools import partial
+from typing import Sequence
 
 import numpy as np
 from tqdm import trange, tqdm
@@ -7,14 +8,53 @@ from simplegep.dp.rdp_accountant import compute_rdp, get_privacy_spent, get_sigm
 
 
 def get_epsilon_from_epsilon_bar(epsilon_bar: float, alpha: float, delta: float):
+    """
+    Convert Rényi DP budget (epsilon_bar) to approximate DP epsilon.
+
+    Parameters:
+        epsilon_bar (float): Rényi DP budget at order alpha (a.k.a. epsilon-bar).
+        alpha (float): Rényi order (> 1).
+        delta (float): Target delta for (epsilon, delta)-DP.
+
+    Returns:
+        float: The corresponding (approximate) DP epsilon.
+    """
     return epsilon_bar - math.log(delta) / (alpha - 1)
 
 
 def get_epsilon_bar_from_epsilon(epsilon: float, alpha: float, delta: float):
+    """
+    Convert approximate DP epsilon to Rényi DP budget (epsilon_bar) at a given order.
+
+    Parameters:
+        epsilon (float): (Approximate) DP epsilon.
+        alpha (float): Rényi order (> 1).
+        delta (float): Target delta for (epsilon, delta)-DP.
+
+    Returns:
+        float: The corresponding Rényi DP budget (epsilon-bar).
+    """
     return epsilon + math.log(delta) / (alpha - 1)
 
 
-def privacy_budget_left(sampling_prob, steps, cur_sigma, delta, rdp_orders=32):
+def privacy_budget_left(sampling_prob: float, steps: int, cur_sigma: float, delta: float, rdp_orders: int=32) -> tuple[float, float]:
+    """
+    Compute the consumed epsilon and its Rényi counterpart (epsilon-bar) for a Gaussian mechanism
+    under Poisson subsampling, given current noise level and iterations.
+
+    Parameters:
+        sampling_prob (float): Sampling probability q per step (e.g., batch_size / dataset_size).
+        steps (int | list[int]): Number of steps (iterations). If a list is supplied, its interpretation
+            depends on the downstream accountant function usage.
+        cur_sigma (float): Noise multiplier (std/sensitivity).
+        delta (float): Target delta for (epsilon, delta)-DP.
+        rdp_orders (int): Upper bound (exclusive) for even Rényi orders to evaluate, starting from 2.
+
+    Returns:
+        tuple[float, float]:
+            - cur_eps (float): Spent (approximate) DP epsilon up to the specified steps.
+            - epsilon_bar (float): Corresponding Rényi DP budget at the optimal order chosen by the accountant.
+    """
     orders = np.arange(2, rdp_orders, 2.0)
     rdp = compute_rdp(sampling_prob, cur_sigma, steps, orders)
     cur_eps, _, opt_order = get_privacy_spent(orders, rdp, target_delta=delta)
@@ -23,7 +63,26 @@ def privacy_budget_left(sampling_prob, steps, cur_sigma, delta, rdp_orders=32):
     # print(f"epsilon_bar: {epsilon_bar}")
     return float(cur_eps), epsilon_bar
 
-def calc_privacy_spent_by_sigmas_and_probs(qlist: list[float], eps: float, delta, sigmas, alpha=32):
+
+def calc_privacy_spent_by_sigmas_and_probs(qlist: list[float], eps: float, delta: float, sigmas: Sequence[float], alpha: int=32) -> tuple[list[float], list[float]]:
+    """
+    Accumulate privacy spending across epochs with varying sampling probabilities and noise multipliers.
+
+    Iteratively aggregates epsilon-bar over epochs, converts it to epsilon at a fixed alpha,
+    and stops when the target epsilon would be exceeded.
+
+    Parameters:
+        qlist (list[float]): Sampling probabilities per epoch.
+        eps (float): Target epsilon to not exceed.
+        delta (float): Target delta for (epsilon, delta)-DP.
+        sigmas (Sequence[float]): Noise multipliers (std/sensitivity) per epoch.
+        alpha (float): Fixed Rényi order used to convert epsilon-bar to epsilon.
+
+    Returns:
+        tuple[list[float], list[float]]:
+            - accumulated_epsilon_list: Epsilon after each epoch (monotone non-decreasing, truncated before exceeding eps).
+            - accumulated_epsilon_bar_list: Corresponding accumulated epsilon-bar after each epoch.
+    """
     assert len(qlist) == len(sigmas), (f'Expected qlist and sigmas to have the same length,'
                                        f' but got {len(qlist)} and {len(sigmas)} respectively.')
     accumulated_epsilon_bar, accumulated_epsilon = 0.0, 0.0
@@ -43,7 +102,23 @@ def calc_privacy_spent_by_sigmas_and_probs(qlist: list[float], eps: float, delta
 
     return accumulated_epsilon_list, accumulated_epsilon_bar_list
 
+
 def calc_privacy_spent_by_sigma(q, eps, delta, sigmas, alpha=32):
+    """
+    Accumulate privacy spending across epochs with a fixed sampling probability and varying noise multipliers.
+
+    Parameters:
+        q (float): Sampling probability per step.
+        eps (float): Target epsilon to not exceed.
+        delta (float): Target delta for (epsilon, delta)-DP.
+        sigmas (Sequence[float]): Noise multipliers (std/sensitivity) per epoch.
+        alpha (float): Fixed Rényi order used to convert epsilon-bar to epsilon.
+
+    Returns:
+        tuple[list[float], list[float]]:
+            - accumulated_epsilon_list: Epsilon after each epoch (monotone non-decreasing, truncated before exceeding eps).
+            - accumulated_epsilon_bar_list: Corresponding accumulated epsilon-bar after each epoch.
+    """
     accumulated_epsilon_bar, accumulated_epsilon = 0.0, 0.0
     accumulated_epsilon_bar_list, accumulated_epsilon_list = [], []
     steps_in_epoch = int(1 / q)
@@ -63,10 +138,36 @@ def calc_privacy_spent_by_sigma(q, eps, delta, sigmas, alpha=32):
 
 
 def get_renyi_gaussian_sigma(sensitivity: float, alpha: float, epsilon_bar: float):
+    """
+    Compute the Gaussian noise multiplier (std/sensitivity) that satisfies a given Rényi DP budget.
+
+    For the Gaussian mechanism under RDP, sigma = sqrt(alpha * sensitivity^2 / (2 * epsilon_bar)).
+
+    Parameters:
+        sensitivity (float): L2-sensitivity of the query/mechanism.
+        alpha (float): Rényi order (> 1).
+        epsilon_bar (float): Target Rényi DP budget at order alpha.
+
+    Returns:
+        float: Required noise multiplier (std/sensitivity).
+    """
     return np.sqrt(np.array([((sensitivity ** 2.0) * alpha) / (2.0 * epsilon_bar)])).item()
 
 
 def search_for_optimal_alpha(epsilon: float, deltas: list[float], alphas: list[float]):
+    """
+    For each delta, search over a set of Rényi orders to find the one inducing the smallest Gaussian sigma.
+
+    Parameters:
+        epsilon (float): Target (approximate) DP epsilon.
+        deltas (list[float]): Candidate delta values.
+        alphas (list[float]): Candidate Rényi orders to evaluate.
+
+    Returns:
+        tuple[dict[float, list[float]], dict[float, float]]:
+            - sigmas_for_delta: Mapping delta -> list of sigma values corresponding to each alpha.
+            - optimal_order_for_delta: Mapping delta -> alpha that minimizes sigma.
+    """
     optimal_order_for_delta, sigmas_for_delta = {}, {}
     for delta in deltas:
         sigmas = [get_renyi_gaussian_sigma(sensitivity=1.0, alpha=alpha,
@@ -93,11 +194,33 @@ def search_for_optimal_alpha(epsilon: float, deltas: list[float], alphas: list[f
 
 
 def linear_decrease(upper_bound, lower_bound, num_values):
+    """
+    Generate a linearly decreasing sequence from upper_bound to lower_bound (exclusive of endpoint in step size).
+
+    Parameters:
+        upper_bound (float): Starting value.
+        lower_bound (float): Ending value.
+        num_values (int): Number of values to generate.
+
+    Returns:
+        list[float]: Sequence of length num_values decreasing approximately linearly.
+    """
     diff = (upper_bound - lower_bound) / num_values
     return [upper_bound - diff * i for i in range(num_values)]
 
 
 def geometric_decrease(upper_bound, lower_bound, num_values):
+    """
+    Generate a geometrically decreasing sequence from upper_bound to lower_bound.
+
+    Parameters:
+        upper_bound (float): Starting value (> 0).
+        lower_bound (float): Ending value (> 0, < upper_bound).
+        num_values (int): Number of values to generate.
+
+    Returns:
+        list[float]: Sequence of length num_values decreasing geometrically.
+    """
     factor = (lower_bound / upper_bound) ** (1 / num_values)
     return [upper_bound * factor ** i for i in range(num_values)]
 
@@ -116,6 +239,18 @@ def geometric_decrease(upper_bound, lower_bound, num_values):
 
 
 def logarithmic_decrease(upper_bound, lower_bound, num_values):
+    """
+    Generate a decreasing sequence using a convex mapping of a normalized domain, yielding a
+    faster drop early on and slower later (log-like behavior via convex functions).
+
+    Parameters:
+        upper_bound (float): Starting value.
+        lower_bound (float): Ending value.
+        num_values (int): Number of values to generate.
+
+    Returns:
+        list[float]: Sequence of length num_values decreasing with a convex profile.
+    """
     # Convex functions
     funcs = {
         r"$x^2$": lambda x: x ** 2,
@@ -133,6 +268,18 @@ def logarithmic_decrease(upper_bound, lower_bound, num_values):
 
 
 def step_decrease(upper_bound, lower_bound, num_values, upper_ratio=0.84):
+    """
+    Generate a step-wise decreasing sequence with two plateaus.
+
+    Parameters:
+        upper_bound (float): Value for the initial plateau.
+        lower_bound (float): Value for the final plateau.
+        num_values (int): Total number of values to generate.
+        upper_ratio (float): Fraction of the sequence at the upper plateau (in [0, 1]).
+
+    Returns:
+        list[float]: Sequence with an initial segment at upper_bound followed by lower_bound.
+    """
     num_step_upper = int(upper_ratio * num_values)
     num_step_lower = num_values - num_step_upper
     sigam_factors = [upper_bound] * num_step_upper + [lower_bound] * num_step_lower
@@ -140,6 +287,19 @@ def step_decrease(upper_bound, lower_bound, num_values, upper_ratio=0.84):
 
 
 def get_decrease_function(args):
+    """
+    Resolve a named decrease schedule function from CLI/args.
+
+    Parameters:
+        args: An object with attribute 'decrease_shape' being one of:
+              {'linear', 'geometric', 'logarithmic', 'step'}.
+
+    Returns:
+        Callable: The corresponding schedule function taking (upper_bound, lower_bound, num_values).
+
+    Raises:
+        AssertionError: If args.decrease_shape is not a supported value.
+    """
     get_decrease_function.hub = {'linear': linear_decrease,
                                  'geometric': geometric_decrease,
                                  'logarithmic': logarithmic_decrease,
@@ -153,6 +313,35 @@ def get_decrease_function(args):
 def get_varying_sigma_values(q, n_epoch, eps, delta,
                              initial_sigma_factor, final_sigma_factor, decrease_func,
                              extra_noise_units=0, noise_for_step=0, alpha=32):
+    """
+    Construct a per-epoch sigma schedule that decreases over time, and compute cumulative privacy spending.
+
+    The base sigma is computed to meet (eps, delta)-DP with fixed q over n_epoch if sigma were constant.
+    The provided decrease_func scales this base sigma between initial_sigma_factor and final_sigma_factor.
+    Optionally, additional noise can be added for a prefix of epochs.
+
+    Parameters:
+        q (float): Sampling probability per step.
+        n_epoch (int): Number of epochs (length of the schedule).
+        eps (float): Target epsilon for budgeting.
+        delta (float): Target delta for (epsilon, delta)-DP.
+        initial_sigma_factor (float): Multiplier for the initial epoch (> final_sigma_factor).
+        final_sigma_factor (float): Multiplier for the final epoch (> 0).
+        decrease_func (Callable): Function that returns a sequence of factors of length n_epoch.
+        extra_noise_units (int, optional): Total units of additive noise to distribute at the beginning. Default: 0.
+        noise_for_step (int, optional): Add this amount to each of the earliest epochs while budgeted by extra_noise_units. Default: 0.
+        alpha (float, optional): Fixed Rényi order for converting epsilon-bar to epsilon. Default: 32.
+
+    Returns:
+        tuple[np.ndarray, list[float], list[float], float]:
+            - sigmas (np.ndarray): The sigma schedule truncated so cumulative epsilon does not exceed eps.
+            - accumulated_epsilon_list (list[float]): Epsilon after each kept epoch.
+            - accumulated_epsilon_bar_list (list[float]): Epsilon-bar after each kept epoch.
+            - sigma_orig (float): The base sigma before applying factors.
+
+    Raises:
+        AssertionError: If initial/final sigma factors are invalid.
+    """
     assert initial_sigma_factor > final_sigma_factor, "Initial sigma factor must be greater than final sigma factor"
     assert final_sigma_factor > 0, "Final sigma factor must be greater than 0"
 

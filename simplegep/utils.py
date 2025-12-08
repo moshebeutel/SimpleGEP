@@ -46,7 +46,7 @@ def parse_args(description: str):
     parser.add_argument('--clip_strategy', default='median', type=str, choices=['value', 'median', 'max'],
                         help='clip strategy name: value, median, max')
     parser.add_argument('--clip_value', default=5., type=float, help='gradient clipping bound')
-    parser.add_argument('--eps', default=1., type=float, help='privacy parameter epsilon')
+    parser.add_argument('--eps', default=8., type=float, help='privacy parameter epsilon')
     parser.add_argument('--dp_sigma', default=0., type=float, help='privacy noise factor')
 
     ## arguments for GEP

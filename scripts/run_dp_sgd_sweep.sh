@@ -11,5 +11,5 @@ echo "Current Working Directory"
 pwd
 
 echo 'Run DP-SGD sweep'
-poetry run python sweepres/sweep.py -p --dp_method dp_sgd
+poetry run python sweepers/sweep.py -p --dp_method dp_sgd
 echo 'DP-SGD sweep finished'

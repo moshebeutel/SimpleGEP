@@ -17,9 +17,8 @@ from simplegep.embeddings.embedder import Embedder
 from simplegep.models.factory import get_model
 from simplegep.models.utils import initialize_weights, count_parameters, substitute_grads, load_checkpoint, \
     save_checkpoint
-from simplegep.trainers.loss_function_factory import get_loss_function
-from simplegep.trainers.optimizer_factory import get_optimizer
 from simplegep.trainers.utils import eval_model
+from simplegep.trainers.factory import get_loss_function, get_optimizer
 
 
 def train_epoch(net, loss_function, optimizer, train_loader, grads_processor,

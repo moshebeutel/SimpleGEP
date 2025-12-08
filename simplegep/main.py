@@ -20,7 +20,7 @@ if __name__ == "__main__":
     args = parse_args(description=f'Differentially Private learning')
     if args.dp_method == 'gep':
         from simplegep.trainers.gep_trainer import train
-    elif args.dp_method == 'dp_sgs':
+    elif args.dp_method == 'dp_sgd':
         from simplegep.trainers.dp_sgd_trainer import train
     elif args.dp_method == 'super':
         from simplegep.trainers.super_trainer import train

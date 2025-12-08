@@ -7,9 +7,8 @@ from simplegep.data.cifar_loader import get_train_loader, get_test_loader
 from simplegep.dp.per_sample_grad import pretrain_actions
 from simplegep.models.factory import get_model
 from simplegep.models.utils import initialize_weights, count_parameters
-from simplegep.trainers.loss_function_factory import get_loss_function
-from simplegep.trainers.optimizer_factory import get_optimizer
 from simplegep.trainers.utils import eval_model
+from simplegep.trainers.factory import get_loss_function, get_optimizer
 
 
 def train_epoch(net, loss_function, optimizer, train_loader):

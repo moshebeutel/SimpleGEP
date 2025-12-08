@@ -37,7 +37,8 @@ def get_epsilon_bar_from_epsilon(epsilon: float, alpha: float, delta: float):
     return epsilon + math.log(delta) / (alpha - 1)
 
 
-def privacy_budget_left(sampling_prob: float, steps: int, cur_sigma: float, delta: float, rdp_orders: int=32) -> tuple[float, float]:
+def privacy_budget_left(sampling_prob: float, steps: int, cur_sigma: float, delta: float, rdp_orders: int = 32) -> \
+tuple[float, float]:
     """
     Compute the consumed epsilon and its Rényi counterpart (epsilon-bar) for a Gaussian mechanism
     under Poisson subsampling, given current noise level and iterations.
@@ -64,7 +65,8 @@ def privacy_budget_left(sampling_prob: float, steps: int, cur_sigma: float, delt
     return float(cur_eps), epsilon_bar
 
 
-def calc_privacy_spent_by_sigmas_and_probs(qlist: list[float], eps: float, delta: float, sigmas: Sequence[float], alpha: int=32) -> tuple[list[float], list[float]]:
+def calc_privacy_spent_by_sigmas_and_probs(qlist: list[float], eps: float, delta: float, sigmas: Sequence[float],
+                                           alpha: int = 32) -> tuple[list[float], list[float]]:
     """
     Accumulate privacy spending across epochs with varying sampling probabilities and noise multipliers.
 
@@ -363,7 +365,7 @@ if __name__ == "__main__":
     matplotlib.use('TkAgg')
     import matplotlib.pyplot as plt
 
-    batchsize = 1024
+    batchsize = 512
     n_training = 50_000
     n_epoch = 200
     delta = 1 / n_training
@@ -375,22 +377,23 @@ if __name__ == "__main__":
     first_sampling_prob = sampling_prob
     steps = int(n_epoch / sampling_prob)
     # alphas = list(range(2, 100))
-    alpha = 32   # 32
-
+    alpha = 32  # 32
+    print(f'get_sigma(q={sampling_prob}, T={steps}, eps={epsilon}, delta={delta})')
     cur_sigma, previous_eps = get_sigma(q=sampling_prob, T=steps, eps=epsilon, delta=delta)
     print(f"cur sigma: {cur_sigma}")
     print(f"previous eps: {previous_eps}")
 
-    base_sigma = 1.53
+    # base_sigma = 1.53
+    base_sigma = cur_sigma
     switch_epoch = 128
     sigmas = [base_sigma] * switch_epoch
-    accumulated_epsilon_list, accumulated_epsilon_bar_list = calc_privacy_spent_by_sigma(q = sampling_prob,
-                                                                                         eps = epsilon,
-                                                                                         delta = delta,
-                                                                                         sigmas = sigmas,
-                                                                                         alpha = alpha)
-    print(f"Accumulated epsilon list: {accumulated_epsilon_list}")
-    print(f"Accumulated epsilon bar list: {accumulated_epsilon_bar_list}")
+    accumulated_epsilon_list, accumulated_epsilon_bar_list = calc_privacy_spent_by_sigma(q=sampling_prob,
+                                                                                         eps=epsilon,
+                                                                                         delta=delta,
+                                                                                         sigmas=sigmas,
+                                                                                         alpha=alpha)
+    # print(f"Accumulated epsilon list: {accumulated_epsilon_list}")
+    # print(f"Accumulated epsilon bar list: {accumulated_epsilon_bar_list}")
     print(f"Final epsilon: {accumulated_epsilon_list[-1]}")
     print(f"Final epsilon bar: {accumulated_epsilon_bar_list[-1]}")
     total_renyi_budget = get_epsilon_bar_from_epsilon(epsilon=epsilon, alpha=alpha, delta=delta)
@@ -398,6 +401,7 @@ if __name__ == "__main__":
     left_renyi_budget = total_renyi_budget - accumulated_epsilon_bar_list[-1]
     print(f"Left RDP budget: {left_renyi_budget}")
     left_eps = get_epsilon_from_epsilon_bar(left_renyi_budget, alpha=alpha, delta=delta)
+    print(f'left epsilon {left_eps}')
 
     batchsize = 256
     n_training = 50_000
@@ -414,14 +418,15 @@ if __name__ == "__main__":
 
     sigmas, accumulated_epsilon, accumulated_epsilon_bar, sigma_orig = get_varying_sigma_values(sampling_prob,
                                                                                                 int(n_epoch),
-                                                                                                eps = epsilon,
-                                                                                                delta = delta,
+                                                                                                eps=epsilon,
+                                                                                                delta=delta,
                                                                                                 initial_sigma_factor=initial_sigma_factor,
                                                                                                 final_sigma_factor=final_sigma_factor,
                                                                                                 decrease_func=linear_decrease,
                                                                                                 alpha=alpha)
     print(f"accumulated epsilon bar: {accumulated_epsilon_bar}")
     print(f'accumulated epsilon: {accumulated_epsilon}')
+    print(f'sigma orig {sigma_orig}')
     print(f'sigmas: {sigmas}')
     print(f"Number of sigmas: {len(sigmas)}")
     sigmas_above_orig = np.array(sigmas) > sigma_orig
@@ -430,6 +435,15 @@ if __name__ == "__main__":
     sigmas = [base_sigma] * switch_epoch + sigmas.tolist()
     qlist = [first_sampling_prob] * switch_epoch + [second_sampling_prob] * (len(sigmas) - switch_epoch)
     print(f"Number of sigmas: {len(sigmas)}")
+    print(f'first sampling prob {first_sampling_prob}')
+    print(f'second sampling prob {second_sampling_prob}')
+    print('88888888888888888888888888')
+    print('sampling probability list')
+    print(f'num elements {len(qlist)}, {len(qlist) == len(sigmas)} '
+          f'{min(qlist[:switch_epoch]) == max(qlist[:switch_epoch])}'
+          f' {min(qlist[switch_epoch:]) == max(qlist[switch_epoch:])}'
+          f' {qlist[0]} {qlist[-1]}')
+    print('88888888888888888888888888')
 
     accumulated_epsilon_list, accumulated_epsilon_bar_list = calc_privacy_spent_by_sigma(q=sampling_prob,
                                                                                          eps=epsilon,
@@ -437,14 +451,12 @@ if __name__ == "__main__":
                                                                                          sigmas=sigmas,
                                                                                          alpha=alpha)
 
-
-    print(f"Accumulated epsilon list: {accumulated_epsilon_list}")
-    print(f"Accumulated epsilon bar list: {accumulated_epsilon_bar_list}")
+    # print(f"Accumulated epsilon list: {accumulated_epsilon_list}")
+    # print(f"Accumulated epsilon bar list: {accumulated_epsilon_bar_list}")
     print(f"Final epsilon: {accumulated_epsilon_list[-1]}")
     print(f"Final epsilon bar: {accumulated_epsilon_bar_list[-1]}")
 
     raise Exception("Stop")
-
 
     # sigmas, optimal_orders = search_for_optimal_alpha(epsilon=epsilon, deltas=[delta], alphas=alphas)
     # not_nan_sigmas = [sigma.item() for sigma in sigmas if not np.isnan(sigma)]
@@ -513,8 +525,6 @@ if __name__ == "__main__":
             print(f"Number of sigmas above original sigma: {sum(sigmas_above_orig)}")
             print(f"Accumulated epsilons: {accumulated_epsilon}")
             print(f"Accumulated epsilon-bars: {accumulated_epsilon_bar}")
-            print(f'Accumulated epsilon bar: {accumulated_epsilon_bar[-1]}')
-            print(f'Accumulated epsilon    : {accumulated_epsilon[-1]}')
 
             # plt.plot(range(len(sigmas)), sigmas, label=f'geometric curvature exponent {crv}')
             # plt.scatter(range(len(sigmas)), sigmas, label=f'geometric curv exp {crv} extra {extra_noise_units}, {noise_for_step} for step')

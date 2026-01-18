@@ -6,16 +6,16 @@ authors = ["moshe <moshebeutel@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = ">=3.11"
 torch = "^2.3.0"
 torchvision = "^0.18"
 tqdm = "^4.66.4"
 wandb = "^0.17.4"
 backpack-for-pytorch = "^1.7.1"
 six = "^1.17.0"
-scipy = "^1.16.0"
-scikit-learn = "^1.7.0"
-matplotlib = "^3.10.3"
+scipy = "^1.17.0"
+matplotlib = "^3.10.8"
+scikit-learn = "^1.8.0"
 
 
 [build-system]

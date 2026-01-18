@@ -109,6 +109,18 @@ def main(args):
         }
     }
 
+    sweep_configuration = {
+        "name": f"{args.dp_method.upper()}_SEED_{args.seed}_{args.model_name.upper()}_EPS_{args.eps}",
+        "method": "bayes",
+        "metric": {"goal": "maximize", "name": "test_acc"},
+        "parameters": {
+            "lr": {"min": 1e-2, "max": 3e-2},
+            "seed": {"values": [args.seed]},
+            "clip_value": {"min": 1.0e-2, "max": 1.0},
+            "clip_strategy": {"values": ["value"]},
+            "batchsize": {"values": [64, 128, 256]},
+        }
+    }
     # wandb.login()
 
     sweep(sweep_config=sweep_configuration, args=args,

@@ -3,7 +3,7 @@ import logging
 import torch
 from tqdm import tqdm
 from simplegep.data.cifar_loader import get_train_loader, get_test_loader
-from simplegep.dp.dp_params import get_dp_params
+from simplegep.dp.dp_params import get_dp_params, DPParams
 from simplegep.dp.grads_proc import GradsProcessor
 from simplegep.dp.dynamic_dp import get_varying_sigma_values, get_decrease_function
 from simplegep.dp.per_sample_grad import pretrain_actions, backward_pass_get_batch_grads
@@ -105,18 +105,14 @@ def train(args, logger: logging.Logger):
     test_loader = get_test_loader(root=args.data_root, batchsize=args.batchsize)
     logger.debug(f'test loader created size {len(test_loader)}')
 
+
+
     dp_params = get_dp_params(batchsize=args.batchsize,
                               num_training_samples=len(train_loader.dataset),
                               num_epochs=args.num_epochs,
-                              epsilon=args.eps)
-    logger.debug(
-        f'DP params set: '
-        f' batchsize {args.batchsize}'
-        f' num_training_samples {len(train_loader.dataset)}'
-        f' num_epochs {args.num_epochs}'
-        f' epsilon {args.eps}'
-    )
-    logger.debug(f'DP params - '
+                              epsilon=args.eps, sigma=args.dp_sigma)
+
+    logger.info(f'DP params - '
                  f' sigma {dp_params.sigma}'
                  f' delta {dp_params.delta} '
                  f' epsilon {dp_params.epsilon}'

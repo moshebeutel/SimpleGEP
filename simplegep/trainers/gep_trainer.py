@@ -123,15 +123,9 @@ def train(args, logger: logging.Logger):
     dp_params = get_dp_params(batchsize=args.batchsize,
                               num_training_samples=len(train_loader.dataset),
                               num_epochs=args.num_epochs,
-                              epsilon=args.eps)
-    logger.debug(
-        f'DP params set: '
-        f' batchsize {args.batchsize}'
-        f' num_training_samples {len(train_loader.dataset)}'
-        f' num_epochs {args.num_epochs}'
-        f' epsilon {args.eps}'
-    )
-    logger.debug(f'DP params - '
+                              epsilon=args.eps, sigma=args.dp_sigma)
+
+    logger.info(f'DP params - '
                  f' sigma {dp_params.sigma}'
                  f' delta {dp_params.delta} '
                  f' epsilon {dp_params.epsilon}'
@@ -144,7 +138,8 @@ def train(args, logger: logging.Logger):
         logger.debug(f'Using decrease function {sigma_decrease_function.__name__}')
         sigma_list, accumulated_epsilon_list, accumulated_epsilon_bar_list, sigma_orig = (
             get_varying_sigma_values(q=dp_params.sampling_prob,
-                                     n_epoch=args.num_epochs,
+                                     n_epoch=args.num_epochs - start_epoch,
+                                     # n_epoch=args.num_epochs,
                                      eps=args.eps, delta=dp_params.delta,
                                      initial_sigma_factor=args.dynamic_noise_high_factor,
                                      final_sigma_factor=args.dynamic_noise_low_factor,

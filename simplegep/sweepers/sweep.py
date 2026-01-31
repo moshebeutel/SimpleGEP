@@ -110,15 +110,18 @@ def main(args):
     }
 
     sweep_configuration = {
-        "name": f"{args.dp_method.upper()}_SEED_{args.seed}_{args.model_name.upper()}_EPS_{args.eps}",
+        "name": f"{args.dp_method.upper()}_SEED_{args.seed}_{args.dataset.upper()}_EPS_{args.eps}",
         "method": "bayes",
         "metric": {"goal": "maximize", "name": "test_acc"},
+        "early_terminate": {"eta": 3, "s": 2, "type": "hyperband", "min_iter": 5},
         "parameters": {
-            "lr": {"min": 1e-2, "max": 3e-2},
+            "lr": {"min": 1e-2, "max": 0.1},
             "seed": {"values": [args.seed]},
-            "clip_value": {"min": 1.0e-2, "max": 1.0},
+            "clip_value": {"min": 1.0e-4, "max": 1.0},
+            "num_basis": {"min": 50, "max": 1000},
+            "num_epochs": {"min": 10, "max": 100},
             "clip_strategy": {"values": ["value"]},
-            "batchsize": {"values": [64, 128, 256]},
+            "batchsize": {"values": [1024, 512]},
         }
     }
     # wandb.login()

@@ -1,5 +1,7 @@
 import torch
 
+from simplegep.data import cifar_loader
+
 loss_function_hub = {'cross_entropy': torch.nn.CrossEntropyLoss}
 
 
@@ -20,3 +22,15 @@ def get_optimizer(args, model):
     param_dict = {key:args.__dict__[key] for key in param_keys}
     optimizer = optimizer_func(model.parameters(), **param_dict)
     return optimizer
+
+
+def get_dataloaders(args):
+    if args.dataset == 'cifar10':
+        from simplegep.data.cifar_loader import  get_dataloaders
+    elif args.dataset == 'putemg':
+        from simplegep.data.putemg_loader import get_dataloaders
+    elif args.dataset == 'keypressemg':
+        from simplegep.data.keypressemg_loader import get_dataloaders
+    else:
+        raise ValueError(f'Dataset {args.dataset} not supported')
+    return get_dataloaders(args)

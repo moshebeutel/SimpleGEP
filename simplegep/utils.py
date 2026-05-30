@@ -6,21 +6,57 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from simplegep.trainers.utils import str2bool
 
-def parse_args(description: str):
-    parser = argparse.ArgumentParser(description=description)
+def add_arguments_keypressemg(parser, project_dir: Path):
+    parser.add_argument("--depth_power", type=int, default=1)
+    parser.add_argument("--num-features", type=int, default=128, choices=[128],
+                        help="Number of extracted features (model input size)")
+    parser.add_argument("--num-features-per-channel", type=int, default=16,
+                        help="Number of extracted features per channel")
+    parser.add_argument("--data_root", type=str,
+                            # default=(project_dir / 'data/EMG/keypressemg/CleanData/valid_features').as_posix(),
+                            default=(project_dir / 'data/EMG/keypressemg/CleanData/valid_features_long_npy').as_posix(),
+                            help="dir path for dataset")
+    parser.add_argument("--num_classes", type=int, default=26, help="number of classes in the dataset")
+
+    parser.add_argument('--log_data_statistics', type=str, default=True)
+
+    return parser
+
+def add_arguments_putemg(parser, project_dir):
+    parser.add_argument("--depth_power", type=int, default=1)
+    parser.add_argument("--num-features", type=int, default=128, choices=[384, 128],
+                        help="Number of extracted features (model input size)")
+    parser.add_argument("--num-features-per-channel", type=int, default=16,
+                        help="Number of extracted features per channel")
+    parser.add_argument("--data_root", type=str,
+                        # default='./data/EMG/putEMG/Data-HDF5-Features-NoArgs',
+                        default=(project_dir / 'data/EMG/putEMG/Data-HDF5-Features-Short-Time').as_posix(),
+                        # default='./data/EMG/putEMG/Data-HDF5-Features-Small',
+                        # default=(Path.home() / 'datasets/EMG/putEMG/Data-HDF5-Features-Small').as_posix(),
+                        help="dir path for dataset")
+    parser.add_argument("--num_classes", type=int, default=4, help="number of classes in the dataset")
+
+    parser.add_argument('--log_data_statistics', type=str, default=False)
+
+def parse_args(data_name: str, dp_method: str):
+    use_gp = False
+    parser = argparse.ArgumentParser(
+        description=f"{'GP_' if use_gp else ''}{data_name.upper()} {dp_method.upper()} Federated Learning")
     project_dir = Path(__file__).resolve().parent
-    model_name = 'resnet20'
+    model_name = 'resnet20' if data_name == 'cifar10' else 'feature_model'
     # model_name = 'tiny_cifar_net_4'
     ## general arguments
-    parser.add_argument('--dataset', default='cifar10', type=str, help='dataset name')
-    parser.add_argument('--data_root', default=project_dir / 'data', type=str, help='dataset directory')
+    parser.add_argument('--dataset', default=data_name, type=str, help='dataset name')
     parser.add_argument('--log_root', default=project_dir / 'log', type=str, help='log directory')
     parser.add_argument('--log_level', default='DEBUG', type=str, choices=['DEBUG', 'INFO'],
                         help='log level: DEBUG, INFO Default: DEBUG.')
+    parser.add_argument('--use-gp', type=str2bool, default=use_gp)
+
     parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
-    parser.add_argument('--sess', default=f'{model_name}_cifar10', type=str, help='session name')
-    parser.add_argument('--checkpoint', default=f'{model_name}_cifar10.tar', type=str, help='session name')
+    parser.add_argument('--sess', default=f'{dp_method}_{data_name}', type=str, help='session name')
+    parser.add_argument('--checkpoint', default=f'{model_name}_{data_name}.tar', type=str, help='session name')
     parser.add_argument('--model_name', default=model_name, type=str, help='model name')
     parser.add_argument('--loss_function', default='cross_entropy', type=str, help='loss function name')
     parser.add_argument('--optimizer', default='adam', type=str, help='optimizer name')
@@ -32,7 +68,7 @@ def parse_args(description: str):
     parser.add_argument('--momentum', default=0.9, type=float, help='value of momentum')
 
     ## arguments for learning with differential privacy
-    parser.add_argument('--dp_method', default="dp_sgd", choices=['no_dp', 'dp_sgd', 'gep', 'super'],
+    parser.add_argument('--dp_method', default=dp_method, choices=['no_dp', 'dp_sgd', 'gep', 'super'],
                         help='Differential privacy method: dp_sgd, gep, no dp, super. Default: dp_sgd.')
     parser.add_argument('--private', '-p', action='store_true', help='enable differential privacy')
     parser.add_argument('--dynamic_noise', action='store_true', help='varying noise levels for each epoch')
@@ -64,6 +100,13 @@ def parse_args(description: str):
                         help='name of the public dataset, [cifar10, cifar100, imagenet]')
     parser.add_argument('--aux_data_size', default=2000, type=int, help='size of the auxiliary dataset')
     parser.add_argument('--wandb', type=bool, default=True, help='enable wandb')
+
+    if (data_name == 'putemg'):
+        add_arguments_putemg(parser, project_dir=project_dir)
+    elif (data_name == 'keypressemg'):
+        add_arguments_keypressemg(parser, project_dir=project_dir)
+    else:
+        parser.add_argument('--data_root', default=project_dir / 'data', type=str, help='dataset directory')
 
     args = parser.parse_args()
     return args

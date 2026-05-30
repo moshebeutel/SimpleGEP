@@ -3,12 +3,12 @@ import logging
 import torch
 import wandb
 from tqdm import tqdm
-from simplegep.data.cifar_loader import get_train_loader, get_test_loader
+
 from simplegep.dp.per_sample_grad import pretrain_actions
 from simplegep.models.factory import get_model
-from simplegep.models.utils import initialize_weights, count_parameters
+from simplegep.models.utils import initialize_weights, count_parameters, load_checkpoint, save_checkpoint
 from simplegep.trainers.utils import eval_model
-from simplegep.trainers.factory import get_loss_function, get_optimizer
+from simplegep.trainers.factory import get_loss_function, get_optimizer, get_dataloaders
 
 
 def train_epoch(net, loss_function, optimizer, train_loader):
@@ -59,9 +59,7 @@ def train_epoch(net, loss_function, optimizer, train_loader):
 
 
 def train(args, logger: logging.Logger):
-    logger.info('Starting training')
-    if args.wandb:
-        wandb.init(project='GEP', name=args.sess)
+    logger.info(f'Starting training {__file__}')
 
     net = get_model(args)
     initialize_weights(net)
@@ -74,27 +72,53 @@ def train(args, logger: logging.Logger):
     loss_function = get_loss_function(args.loss_function, reduction=reduction)
     logger.debug(f'loss function set to {args.loss_function} reduction {reduction}')
 
+    best_val_acc = 0.0
+    start_epoch = 0
+    checkpoint_name = ''
+    if args.resume:
+        start_epoch, best_val_acc, seed, rng_state = load_checkpoint(checkpoint_path=args.checkpoint, net=net,
+                                                                 optimizer=None)
+        assert args.seed == seed, f'Expected checkpoint seed equals session seed. Got {seed} != {args.seed}'
+        logger.info(f'Loaded checkpoint {args.checkpoint} with epoch {start_epoch} best acc {best_val_acc}')
+
     net, loss_function = pretrain_actions(model=net, loss_func=loss_function)
     logger.debug('model and loss functions prepared for per sample grads')
+    net = net.cuda()
 
     optimizer = get_optimizer(args=args, model=net)
     logger.debug(f'optimizer set to {args.optimizer} lr {args.lr}')
 
-    train_loader = get_train_loader(root=args.data_root, batchsize=args.batchsize)
+    train_loader, val_loader, test_loader = get_dataloaders(args)
+
     logger.debug(f'train loader created size {len(train_loader)}')
-    test_loader = get_test_loader(root=args.data_root, batchsize=args.batchsize)
     logger.debug(f'test loader created size {len(test_loader)}')
 
     num_epochs = args.num_epochs
-    net = net.cuda()
     for epoch in range(num_epochs):
         logger.info(f'***** Starting epoch {epoch}  ******')
         train_loss, train_acc = train_epoch(net=net, loss_function=loss_function, optimizer=optimizer,
                                             train_loader=train_loader)
         logger.info(f'Epoch {epoch}/{args.num_epochs} train loss {train_loss:.2f} train accuracy {train_acc:.2f}')
-        test_loss, test_acc = eval_model(net=net, loss_function=loss_function, loader=test_loader)
-        logger.info(f'Epoch {epoch}/{args.num_epochs} test loss {test_loss:.2f} test accuracy {test_acc:.2f}')
+        val_loss, val_acc = eval_model(net=net, loss_function=loss_function, loader=val_loader)
+        logger.info(f'Epoch {epoch}/{args.num_epochs} test loss {val_loss:.2f} test accuracy {val_acc:.2f}')
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            checkpoint_name = save_checkpoint(net=net,
+                                              optimizer=optimizer,
+                                              acc=val_acc,
+                                              epoch=epoch,
+                                              seed=args.seed,
+                                              sess=args.sess)
+            logger.info(f'Best Acc = {best_val_acc}. Checkpoint {checkpoint_name} saved!')
         if args.wandb:
-            wandb.log({'train_loss': train_loss, 'train_acc': train_acc, 'test_loss': test_loss,
-                       'test_acc': test_acc}, step=epoch)
+            wandb.log({'train_loss': train_loss, 'train_acc': train_acc, 'val_loss': val_loss,
+                       'val_acc': val_acc, 'best_val_acc': best_val_acc}, step=epoch)
+
+
+    load_checkpoint(checkpoint_path=checkpoint_name, net=net, optimizer=None)
+    test_loss, test_acc = eval_model(net=net, loss_function=loss_function, loader=test_loader)
+    logger.info(f'Final test loss {test_loss:.2f} test accuracy {test_acc:.2f}')
+    if args.wandb:
+        wandb.log({'test_loss': test_loss, 'test_acc': test_acc})
+        wandb.finish()
 

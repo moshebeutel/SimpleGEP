@@ -37,7 +37,9 @@ def count_parameters(model, return_layer_sizes=False):
 
 def substitute_grads(net, grads):
     offset = 0
-    for param in net.parameters():
+    for n,param in net.named_parameters():
+        if '_batch_norm' in n:
+            continue
         numel = param.numel()
         grad = grads[offset:offset + numel].reshape(param.shape).to(param.device)
         param.grad = grad.clone().reshape(param.shape)

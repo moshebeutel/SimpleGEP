@@ -10,6 +10,6 @@ cd ../simplegep || exit
 echo "Current Working Directory"
 pwd
 
-echo 'Run DP-SGD trainer'
-poetry run train_dp_sgd_cifar10
-echo 'DP-SGD trainer finished'
+echo 'Run no dp trainer'
+poetry run train_no_dp_cifar10
+echo 'no dp trainer finished'

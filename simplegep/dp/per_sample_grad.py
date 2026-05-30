@@ -16,7 +16,10 @@ def backward_pass_get_batch_grads(batch_loss: torch.Tensor, net: torch.nn.Module
     grad_batch_list = []
     with backpack(BatchGrad()):
         batch_loss.backward()
-    for p in net.parameters():
+    for n, p in net.named_parameters():
+        if not hasattr(p, 'grad_batch') or p.grad_batch is None:
+            assert '_batch_norm' in n, f'Parameter {n} has no grad_batch attribute'
+            continue
         grad_batch_list.append(p.grad_batch.reshape(p.grad_batch.shape[0], -1))
         p.grad_batch = p.grad_batch.detach().cpu()
         p.grad_batch = None

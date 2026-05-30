@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, List
 
 import torch
 
@@ -23,7 +23,7 @@ def check_approx_error(L: torch.Tensor, target: torch.Tensor, return_cosine=Fals
 
     return error / target_sum_squares
 
-def flatten_tensor(tensor_list: list[ torch.Tensor]) -> torch.Tensor:
+def flatten_tensor(tensor_list: List[ torch.Tensor]) -> torch.Tensor:
     for i in range(len(tensor_list)):
         tensor_list[i] = tensor_list[i].reshape([tensor_list[i].shape[0], -1])
     flatten_param = torch.cat(tensor_list, dim=1)

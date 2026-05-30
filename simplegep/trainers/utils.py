@@ -1,14 +1,24 @@
+import argparse
 import gc
 import torch
 from tqdm import tqdm
 from simplegep.dp.per_sample_grad import backward_pass_get_batch_grads
 from simplegep.models.utils import substitute_grads
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 @torch.no_grad()
 def eval_model(net, loss_function, loader):
     net.eval()
-    test_loss = 0
+    eval_loss = 0
     correct = 0
     total = 0
     all_correct = []
@@ -22,7 +32,7 @@ def eval_model(net, loss_function, loader):
 
             step_loss /= inputs.shape[0]
 
-            test_loss += step_loss
+            eval_loss += step_loss
             _, predicted = torch.max(outputs.data, 1)
             total += targets.size(0)
             correct_idx = predicted.eq(targets.data).cpu()
@@ -30,8 +40,8 @@ def eval_model(net, loss_function, loader):
             correct += correct_idx.sum()
             batch_acc = correct_idx.sum() / targets.size(0)
 
-            pbar.set_description(f'Batch {batch_idx}/{len(loader)} test batch loss {step_loss:.2f}'
-                                 f' test accuracy {batch_acc:.2f}')
+            pbar.set_description(f'Batch {batch_idx}/{len(loader)} eval batch loss {step_loss:.2f}'
+                                 f' eval accuracy {batch_acc:.2f}')
 
             inputs, targets, outputs, loss = (inputs.detach().cpu(), targets.detach().cpu(),
                                               outputs.detach().cpu(), loss.detach().cpu())
@@ -40,10 +50,10 @@ def eval_model(net, loss_function, loader):
             gc.collect()
             torch.cuda.empty_cache()
 
-        test_acc = 100. * float(correct) / float(total)
-        test_loss = test_loss / batch_idx
+        eval_acc = 100. * float(correct) / float(total)
+        eval_loss = eval_loss / batch_idx
 
-    return test_loss, test_acc
+    return eval_loss, eval_acc
 
 def train_epoch(net, loss_function, optimizer, train_loader, grads_processor):
     train_loss, train_acc, correct, total, batch_idx = 0.0, 0.0, 0, 0, 0

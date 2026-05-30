@@ -1,6 +1,6 @@
 import math
 from functools import partial
-from typing import Sequence
+from typing import Sequence, Tuple
 
 import numpy as np
 from tqdm import trange, tqdm
@@ -37,8 +37,8 @@ def get_epsilon_bar_from_epsilon(epsilon: float, alpha: float, delta: float):
     return epsilon + math.log(delta) / (alpha - 1)
 
 
-def privacy_budget_left(sampling_prob: float, steps: int, cur_sigma: float, delta: float, rdp_orders: int = 32) -> \
-tuple[float, float]:
+def privacy_budget_left(sampling_prob: float, steps: int, cur_sigma: float, delta: float,
+                        rdp_orders: int = 32) -> Tuple[float, float]:
     """
     Compute the consumed epsilon and its Rényi counterpart (epsilon-bar) for a Gaussian mechanism
     under Poisson subsampling, given current noise level and iterations.

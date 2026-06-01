@@ -1,8 +1,37 @@
-import time
 from functools import partial
+from logging import Logger
+from pathlib import Path
+from typing import Dict
 import wandb
+import yaml
+
 from simplegep.utils import set_seed, parse_args, set_logger
 
+def load_config(file_path: str)-> Dict:
+    """
+    Loads the configuration from a specified YAML file.
+
+    This function checks the existence, type, and extension of the provided
+    file path to ensure it is a valid YAML configuration file. Once validated,
+    it reads and parses the YAML content, returning the configuration data.
+
+    Args:
+        file_path (str): The path to the YAML configuration file.
+
+    Returns:
+        dict: The parsed configuration data as a dictionary.
+
+    Raises:
+        AssertionError: If the file does not exist, is not a file, or does not
+            have the '.yaml' extension.
+    """
+    config_file_path = Path(file_path)
+    assert config_file_path.exists(), f"config file {config_file_path} does not exist"
+    assert config_file_path.is_file(), f"config file {config_file_path} is not a file"
+    assert config_file_path.suffix == ".yaml", f"config file {config_file_path} is not a yaml file"
+    with open(config_file_path, 'r') as stream:
+        sweep_config = yaml.safe_load(stream)
+    return sweep_config
 
 def sweep_train(sweep_id, args, train_fn, config=None):
     with wandb.init(config=config):
@@ -35,9 +64,7 @@ def sweep(sweep_config, args, train_fn):
 
 
 def main(args):
-    logger = set_logger(logger_name=args.sess, log_dir='log', level='DEBUG')
-    logger.info(f'Logger is set - session: {args.sess}')
-    logger.info(f'Arguments: {args}')
+    logger = init_logger(args)
 
     default_parameters = {
             "lr": {"values": [1e-3]},
@@ -130,7 +157,29 @@ def main(args):
           train_fn=partial(train, logger=logger))
 
 
+def init_logger(args) -> Logger:
+    logger = set_logger(logger_name=args.sess, log_dir='log', level='DEBUG')
+    logger.info(f'Logger is set - session: {args.sess}')
+    logger.info(f'Arguments: {args}')
+    return logger
+
+
+def prepare_sweep(data_name, dp_method, config_yaml_path):
+    args = parse_args(data_name=data_name, dp_method=dp_method)
+    logger = init_logger(args)
+    working_dir = Path(__file__).resolve().parents[2]
+    logger.debug(f'Working dir {working_dir}')
+    config_path =  working_dir / config_yaml_path
+    assert config_path.exists(), f'config file {config_path} does not exist'
+    seed_parameters = {
+        "seed": {"values": [args.seed]}}
+    sweep_configuration = load_config(config_path.as_posix())
+    sweep_configuration['parameters'].update(seed_parameters)
+    return sweep_configuration, args, logger
+
+
 if __name__ == '__main__':
+    working_dir = Path(__file__).resolve().parents[2]
     args = parse_args(description=f'Differentially Private learning sweep')
 
     if args.dp_method == 'gep':

@@ -37,10 +37,21 @@ scikit-learn = "^0.24"
 
 [tool.poetry.scripts]
 train = 'simplegep.main:main'
+
+# cifar10
 train_no_dp_cifar10 = 'simplegep.main:run_no_dp_cifar10'
-train_no_dp_putemg = 'simplegep.main:run_no_dp_putemg'
 train_dp_sgd_cifar10 = 'simplegep.main:run_dp_sgd_cifar10'
+
+# putEMG
+train_no_dp_putemg = 'simplegep.main:run_no_dp_putemg'
 train_dp_sgd_putemg = 'simplegep.main:run_dp_sgd_putemg'
+
+# Toronto UHN Typing Dataset
+train_no_dp_keypressemg = 'simplegep.main:run_no_dp_keypressemg'
+train_dp_sgd_keypressemg = 'simplegep.main:run_dp_sgd_keypressemg'
+
+sweep_no_dp_keypressemg = 'simplegep.main:sweep_keypressemg_no_dp'
+sweep_dp_sgd_keypressemg = 'simplegep.main:sweep_keypressemg_dp_sgd'
 
 
 

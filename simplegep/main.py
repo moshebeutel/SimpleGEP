@@ -1,6 +1,9 @@
 from argparse import Namespace
+from functools import partial
 
 import wandb
+
+from simplegep.sweepers.sweep import prepare_sweep, sweep
 from simplegep.utils import parse_args, set_logger, set_seed
 
 
@@ -17,6 +20,7 @@ def start_train(args, train_fn):
     logger = init_logger(args)
     set_seed(args.seed)
     with wandb.init(project='GEP', name=args.sess):
+        wandb.config.update(vars(args))
         wandb.run.name = '_'.join([f'{k}_{getattr(args, k)}'.upper() for k in ['dp_method',
                                                                                'model_name',
                                                                                'dataset',
@@ -60,6 +64,23 @@ def run_no_dp_cifar10():
 
 
 
+def sweep_keypressemg_no_dp():
+    config_yaml_path = 'simplegep/sweepers/sweep_configurations/keypressemg_sgd_dp_bayes.yaml'
+    sweep_configuration, args, logger = prepare_sweep(data_name='keypressemg', dp_method='no_dp',
+                                                      config_yaml_path=config_yaml_path)
+    from simplegep.trainers.no_dp_trainer import train
+
+    sweep(sweep_config=sweep_configuration, args=args,
+          train_fn=partial(train, logger=logger))
+
+def sweep_keypressemg_dp_sgd():
+    config_yaml_path = 'simplegep/sweepers/sweep_configurations/keypressemg_sgd_dp_bayes.yaml'
+    sweep_configuration, args, logger = prepare_sweep(data_name='keypressemg', dp_method='dp_sgd',
+                                                      config_yaml_path=config_yaml_path)
+    from simplegep.trainers.dp_sgd_trainer import train
+
+    sweep(sweep_config=sweep_configuration, args=args,
+          train_fn=partial(train, logger=logger))
 
 
 def main():
@@ -71,3 +92,5 @@ if __name__ == "__main__":
     # run_dp_sgd_putemg()
     run_no_dp_keypressemg()
     # run_dp_sgd_keypressemg()
+
+

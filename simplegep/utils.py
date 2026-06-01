@@ -42,8 +42,8 @@ def add_arguments_putemg(parser, project_dir):
 
 def parse_args(data_name: str, dp_method: str):
     use_gp = False
-    parser = argparse.ArgumentParser(
-        description=f"{'GP_' if use_gp else ''}{data_name.upper()} {dp_method.upper()} Federated Learning")
+    session_name = f"{'GP_' if use_gp else ''}{data_name.upper()}_DP_{dp_method.upper()}"
+    parser = argparse.ArgumentParser(description=session_name)
     project_dir = Path(__file__).resolve().parent
     model_name = 'resnet20' if data_name == 'cifar10' else 'feature_model'
     # model_name = 'tiny_cifar_net_4'
@@ -55,7 +55,7 @@ def parse_args(data_name: str, dp_method: str):
     parser.add_argument('--use-gp', type=str2bool, default=use_gp)
 
     parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
-    parser.add_argument('--sess', default=f'{dp_method}_{data_name}', type=str, help='session name')
+    parser.add_argument('--sess', default=session_name, type=str, help='session name')
     parser.add_argument('--checkpoint', default=f'{model_name}_{data_name}.tar', type=str, help='session name')
     parser.add_argument('--model_name', default=model_name, type=str, help='model name')
     parser.add_argument('--loss_function', default='cross_entropy', type=str, help='loss function name')

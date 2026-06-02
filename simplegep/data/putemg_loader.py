@@ -2,7 +2,7 @@ import os
 import re
 from pathlib import Path
 from typing import List, Any, Dict
-
+from tqdm import trange
 import psutil
 import torch
 from torch.utils.data import random_split
@@ -11,7 +11,7 @@ from simplegep.utils import set_logger
 
 
 def get_user_list():
-    return ['03', '04', '05']
+    # return ['03', '04', '05']
 
     return ['03', '04', '05', '06', '07', '08', '09', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
             '22', '23', '24', '25', '26', '27', '29', '30', '31', '33', '34', '35', '36', '38', '39', '42', '43', '45',
@@ -166,7 +166,7 @@ def get_dataloaders(args):
     train_y_list, test_y_list = [], []
 
     # for id in range(num_clients // 2):
-    for id in range(num_clients):
+    for id in trange(num_clients):
         train_x_s, test_x_s = [], []
         train_y_s, test_y_s = [], []
 
@@ -285,20 +285,20 @@ def get_dataloaders(args):
     dataset = torch.utils.data.TensorDataset(dataset_x, dataset_y)
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
-    logger.debug(f'Train data list length: {len(train_dataset)}')
-    logger.debug(f'Val data list length: {len(val_dataset)}')
+    logger.info(f'Train data list length: {len(train_dataset)}')
+    logger.info(f'Val data list length: {len(val_dataset)}')
 
     test_x = torch.cat(test_x_list, dim=0)
     test_y_true = torch.cat(test_y_list, dim=0)
     test_dataset = torch.utils.data.TensorDataset(test_x, test_y_true)
-    logger.debug(f'Test data list length: {len(test_dataset)}')
+    logger.info(f'Test data list length: {len(test_dataset)}')
 
     train_loader = torch.utils.data.DataLoader(train_dataset, shuffle=True, batch_size=args.batchsize, num_workers=2)
     val_loader = torch.utils.data.DataLoader(val_dataset, shuffle=False, batch_size=args.batchsize, num_workers=2)
     test_loader = torch.utils.data.DataLoader(test_dataset, shuffle=False, batch_size=args.batchsize, num_workers=2)
 
-    logger.debug(f'Train data loader length: {len(train_loader)}')
-    logger.debug(f'Val data loader length: {len(val_loader)}')
-    logger.debug(f'Test data loader length: {len(test_loader)}')
+    logger.info(f'Train data loader length: {len(train_loader)}')
+    logger.info(f'Val data loader length: {len(val_loader)}')
+    logger.info(f'Test data loader length: {len(test_loader)}')
 
     return train_loader, val_loader, test_loader

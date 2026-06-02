@@ -50,7 +50,7 @@ def parse_args(data_name: str, dp_method: str):
     ## general arguments
     parser.add_argument('--dataset', default=data_name, type=str, help='dataset name')
     parser.add_argument('--log_root', default=project_dir / 'log', type=str, help='log directory')
-    parser.add_argument('--log_level', default='DEBUG', type=str, choices=['DEBUG', 'INFO'],
+    parser.add_argument('--log_level', default='INFO', type=str, choices=['DEBUG', 'INFO'],
                         help='log level: DEBUG, INFO Default: DEBUG.')
     parser.add_argument('--use-gp', type=str2bool, default=use_gp)
 

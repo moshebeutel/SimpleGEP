@@ -1,6 +1,6 @@
 import math
 from functools import partial
-from typing import Sequence, Tuple
+from typing import Sequence, Tuple, List
 
 import numpy as np
 from tqdm import trange, tqdm
@@ -65,8 +65,8 @@ def privacy_budget_left(sampling_prob: float, steps: int, cur_sigma: float, delt
     return float(cur_eps), epsilon_bar
 
 
-def calc_privacy_spent_by_sigmas_and_probs(qlist: list[float], eps: float, delta: float, sigmas: Sequence[float],
-                                           alpha: int = 32) -> tuple[list[float], list[float]]:
+def calc_privacy_spent_by_sigmas_and_probs(qlist: List[float], eps: float, delta: float, sigmas: Sequence[float],
+                                           alpha: int = 32) -> Tuple[List[float], List[float]]:
     """
     Accumulate privacy spending across epochs with varying sampling probabilities and noise multipliers.
 
@@ -156,7 +156,7 @@ def get_renyi_gaussian_sigma(sensitivity: float, alpha: float, epsilon_bar: floa
     return np.sqrt(np.array([((sensitivity ** 2.0) * alpha) / (2.0 * epsilon_bar)])).item()
 
 
-def search_for_optimal_alpha(epsilon: float, deltas: list[float], alphas: list[float]):
+def search_for_optimal_alpha(epsilon: float, deltas: List[float], alphas: List[float]):
     """
     For each delta, search over a set of Rényi orders to find the one inducing the smallest Gaussian sigma.
 

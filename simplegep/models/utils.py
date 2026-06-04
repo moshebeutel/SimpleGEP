@@ -74,6 +74,6 @@ def save_checkpoint(net, optimizer, acc, epoch, seed, sess):
 
     if not os.path.isdir('checkpoint'):
         os.mkdir('checkpoint')
-    checkpoint_name = './checkpoint/' + sess + f'epoch_{epoch}_acc_{acc}.tar'
+    checkpoint_name = './checkpoint/' + sess + f'_epoch_{epoch}_acc_{acc}.tar'
     torch.save(state, checkpoint_name)
     return checkpoint_name

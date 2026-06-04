@@ -2,7 +2,6 @@ import gc
 import logging
 from pathlib import Path
 import torch
-import torchvision
 import wandb
 from tqdm import tqdm
 import simplegep.embeddings.factory
@@ -11,20 +10,20 @@ from simplegep.dp.dp_params import get_dp_params
 from simplegep.dp.grads_history import create_grads_history_container, GradsContainer
 from simplegep.dp.grads_proc import GradsProcessor
 from simplegep.dp.dynamic_dp import get_varying_sigma_values, get_decrease_function
-from simplegep.dp.per_sample_grad import pretrain_actions, backward_pass_get_batch_grads, PublicDataPerSampleGrad
+from simplegep.dp.per_sample_grad import pretrain_actions, backward_pass_get_batch_grads, PublicDataPerSampleGradProvider
 from simplegep.embeddings.embedder import Embedder
 from simplegep.models.factory import get_model
 from simplegep.models.utils import initialize_weights, count_parameters, substitute_grads, load_checkpoint, \
-    save_checkpoint
-from simplegep.trainers.factory import get_loss_function, get_optimizer, get_dataloaders
+save_checkpoint
+from simplegep.trainers.factory import get_loss_function, get_optimizer, get_dataloaders, get_public_grads_provider
 from simplegep.trainers.utils import eval_model
 
 
 def train_epoch(net, loss_function, optimizer, train_loader, grads_processor,
                 embedder: Embedder,
-                pub_data_grads: PublicDataPerSampleGrad,
+                pub_data_grads_provider: PublicDataPerSampleGradProvider,
                 grads_history_container: GradsContainer or None = None):
-    pub_grads = pub_data_grads.get_grads(current_state_dict=net.state_dict())
+    pub_grads = pub_data_grads_provider.get_grads(current_state_dict=net.state_dict())
     if grads_history_container is not None:
         grads_history_container.add(pub_grads)
         pub_grads = grads_history_container.grads
@@ -60,6 +59,8 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor,
         processed_embeddings = grads_processor.process_grads(embedded_grads)
         reconstructed_grads = embedder.project_back(processed_embeddings)
         processed_grads = reconstructed_grads.squeeze()
+        # processed_grads = grads_processor.process_grads(flat_per_sample_grads).squeeze()
+
 
         # substitute perturbed grads
         substitute_grads(net, processed_grads)
@@ -171,17 +172,18 @@ def train(args, logger: logging.Logger):
 
     logger.debug(f'Created {args.embedder} embedder with {args.num_basis} basis elements')
 
-    public_inputs, public_targets = get_aux_data(aux_data_root=args.data_root,
-                                                 aux_dataset=args.aux_dataset,
-                                                 aux_data_size=args.aux_data_size,
-                                                 real_labels=args.real_labels)
+    # public_inputs, public_targets = get_aux_data(aux_data_root=args.data_root,
+    #                                              aux_dataset=args.aux_dataset,
+    #                                              aux_data_size=args.aux_data_size,
+    #                                              real_labels=args.real_labels)
+    #
+    # logger.debug(f'Created public data with {len(public_inputs)} examples')
+    #
+    # pub_data_grads_provider = PublicDataPerSampleGradProvider(public_data=(public_inputs, public_targets), net=net,
+    #                                                  public_batchsize=args.batchsize)
+    pub_data_grads_provider = get_public_grads_provider(args, net)
 
-    logger.debug(f'Created public data with {len(public_inputs)} examples')
-
-    pub_data_grads = PublicDataPerSampleGrad(public_data=(public_inputs, public_targets), net=net,
-                                             public_batchsize=args.batchsize)
-
-    logger.debug(f'Created PublicDataPerSampleGrad {pub_data_grads}')
+    logger.debug(f'Created PublicDataPerSampleGradProvider {pub_data_grads_provider}')
 
     grads_history_container = create_grads_history_container(args, num_params) if args.grads_history_size > 0 else None
 
@@ -189,7 +191,7 @@ def train(args, logger: logging.Logger):
         logger.info(f'***** Starting epoch {epoch}  ******')
         train_loss, train_acc = train_epoch(net=net, loss_function=loss_function, optimizer=optimizer,
                                             train_loader=train_loader, grads_processor=grads_processor,
-                                            embedder=embedder, pub_data_grads=pub_data_grads,
+                                            embedder=embedder, pub_data_grads_provider=pub_data_grads_provider,
                                             grads_history_container=grads_history_container)
         logger.info(f'Epoch {epoch}/{args.num_epochs} train loss {train_loss:.2f} train accuracy {train_acc:.2f}')
         val_loss, val_acc = eval_model(net=net, loss_function=loss_function, loader=val_loader)
@@ -221,24 +223,24 @@ def train(args, logger: logging.Logger):
 
     return best_val_acc, checkpoint_name
 
-def get_aux_data(aux_data_root: Path, aux_dataset: str, aux_data_size: int, real_labels: bool):
-    ## preparing auxiliary data
-    num_public_examples = aux_data_size
-    if ('cifar' in aux_dataset):
-        if (aux_dataset == 'cifar100'):
-            transform_test = torchvision.transforms.Compose([
-                torchvision.transforms.ToTensor(),
-                torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-            ])
-            testset = torchvision.datasets.CIFAR100(root=aux_data_root, train=False, download=True,
-                                                    transform=transform_test)
-        public_data_loader = torch.utils.data.DataLoader(testset, batch_size=num_public_examples, shuffle=False,
-                                                         num_workers=2)  #
-        for public_inputs, public_targets in public_data_loader:
-            break
-    else:
-        public_inputs = torch.load(
-            aux_data_root / 'imagenet_examples_2000')[:num_public_examples]
-    if (not real_labels):
-        public_targets = torch.randint(high=10, size=(num_public_examples,))
-    return public_inputs, public_targets
+# def get_aux_data(aux_data_root: Path, aux_dataset: str, aux_data_size: int, real_labels: bool):
+#     ## preparing auxiliary data
+#     num_public_examples = aux_data_size
+#     if ('cifar' in aux_dataset):
+#         if (aux_dataset == 'cifar100'):
+#             transform_test = torchvision.transforms.Compose([
+#                 torchvision.transforms.ToTensor(),
+#                 torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+#             ])
+#             testset = torchvision.datasets.CIFAR100(root=aux_data_root, train=False, download=True,
+#                                                     transform=transform_test)
+#         public_data_loader = torch.utils.data.DataLoader(testset, batch_size=num_public_examples, shuffle=False,
+#                                                          num_workers=2)  #
+#         for public_inputs, public_targets in public_data_loader:
+#             break
+#     else:
+#         public_inputs = torch.load(
+#             aux_data_root / 'imagenet_examples_2000')[:num_public_examples]
+#     if (not real_labels):
+#         public_targets = torch.randint(high=10, size=(num_public_examples,))
+#     return public_inputs, public_targets

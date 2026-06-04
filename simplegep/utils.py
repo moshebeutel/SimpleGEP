@@ -59,12 +59,12 @@ def parse_args(data_name: str, dp_method: str):
     parser.add_argument('--checkpoint', default=f'{model_name}_{data_name}.tar', type=str, help='session name')
     parser.add_argument('--model_name', default=model_name, type=str, help='model name')
     parser.add_argument('--loss_function', default='cross_entropy', type=str, help='loss function name')
-    parser.add_argument('--optimizer', default='adam', type=str, help='optimizer name')
+    parser.add_argument('--optimizer', default='sgd', type=str, help='optimizer name')
     parser.add_argument('--seed', default=2, type=int, help='random seed')
     parser.add_argument('--weight_decay', default=0., type=float, help='weight decay')
     parser.add_argument('--batchsize', default=256, type=int, help='batch size')
     parser.add_argument('--num_epochs', default=200, type=int, help='total number of epochs')
-    parser.add_argument('--lr', default=0.001, type=float, help='base learning rate (default=0.1)')
+    parser.add_argument('--lr', default=0.1, type=float, help='base learning rate (default=0.1)')
     parser.add_argument('--momentum', default=0.9, type=float, help='value of momentum')
 
     ## arguments for learning with differential privacy
@@ -81,7 +81,7 @@ def parse_args(data_name: str, dp_method: str):
 
     parser.add_argument('--clip_strategy', default='median', type=str, choices=['value', 'median', 'max'],
                         help='clip strategy name: value, median, max')
-    parser.add_argument('--clip_value', default=5., type=float, help='gradient clipping bound')
+    parser.add_argument('--clip_value', default=100, type=float, help='gradient clipping bound')
     parser.add_argument('--eps', default=8., type=float, help='privacy parameter epsilon')
     parser.add_argument('--dp_sigma', default=0., type=float, help='privacy noise factor')
 
@@ -91,7 +91,7 @@ def parse_args(data_name: str, dp_method: str):
     parser.add_argument('--kernel_type', default='rbf', type=str,
                         choices=["linear", "rbf", "poly", "sigmoid", "cosine"], help='embedder name for GEP')
     parser.add_argument('--num_basis', default=1000, type=int, help='total number of basis elements')
-    parser.add_argument('--grads_history_size', default=1000, type=int,
+    parser.add_argument('--grads_history_size', default=2000, type=int,
                         help='total number of history grads to keep for basis calculation')
     parser.add_argument('--stop_embedding_epoch', default=1e10, type=int, help='switch to dp sgd after that epoch')
 
@@ -106,7 +106,12 @@ def parse_args(data_name: str, dp_method: str):
     elif (data_name == 'keypressemg'):
         add_arguments_keypressemg(parser, project_dir=project_dir)
     else:
-        parser.add_argument('--data_root', default=project_dir / 'data', type=str, help='dataset directory')
+        assert data_name == 'cifar10', f'Expected cifar10 dataset. Got {data_name}'
+        parser.add_argument('--data_root', default=project_dir / 'data/CIFAR10', type=str, help='dataset directory')
+        parser.add_argument("--num_classes", type=int, default=10, help="number of classes in the dataset")
+
+        if dp_method == 'gep':
+            parser.add_argument('--aux_data_root', default=project_dir / 'data/CIFAR10', type=str, help='public dataset directory')
 
     args = parser.parse_args()
     return args

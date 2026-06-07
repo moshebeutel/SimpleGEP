@@ -43,7 +43,7 @@ def add_arguments_putemg(parser, project_dir):
 
 def parse_args(data_name: str, dp_method: str):
     import os
-    use_gp = os.environ.get('USE_GP', 'False')
+    use_gp = str2bool(os.environ.get('USE_GP', 'false'))
     session_name = f"{'GP_' if use_gp else ''}{data_name.upper()}_DP_{dp_method.upper()}"
     parser = argparse.ArgumentParser(description=session_name)
     project_dir = Path(__file__).resolve().parent

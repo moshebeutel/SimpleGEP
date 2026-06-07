@@ -44,6 +44,9 @@ train_no_dp_cifar10 = 'simplegep.main:run_no_dp_cifar10'
 train_dp_sgd_cifar10 = 'simplegep.main:run_dp_sgd_cifar10'
 train_gep_cifar10 = 'simplegep.main:run_gep_cifar10'
 
+# single train with GP
+train_gp_dp_sgd_cifar10 = 'simplegep.main:run_gp_dp_sgd_cifar10'
+
 # sweep
 sweep_no_dp_cifar10 = 'simplegep.main:sweep_no_dp_cifar10'
 sweep_dp_sgd_cifar10 = 'simplegep.main:sweep_dp_sgd_cifar10'
@@ -53,6 +56,10 @@ sweep_gep_cifar10 = 'simplegep.main:sweep_gep_cifar10'
 # single train
 train_no_dp_putemg = 'simplegep.main:run_no_dp_putemg'
 train_dp_sgd_putemg = 'simplegep.main:run_dp_sgd_putemg'
+
+
+# single train with GP
+train_gp_dp_sgd_putemg = 'simplegep.main:run_gp_dp_sgd_putemg'
 
 # sweep
 sweep_no_dp_putemg = 'simplegep.main:sweep_no_dp_putemg'

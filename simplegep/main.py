@@ -1,3 +1,4 @@
+import os
 from functools import partial
 import wandb
 
@@ -40,6 +41,12 @@ def run_no_dp_cifar10():
 def run_dp_sgd_cifar10():
     args = parse_args(data_name='cifar10', dp_method='dp_sgd')
     from simplegep.trainers.dp_sgd_trainer import train
+    start_train(args, train_fn=train)
+
+def run_gp_dp_sgd_cifar10():
+    os.environ['USE_GP'] = 'true'
+    args = parse_args(data_name='cifar10', dp_method='dp_sgd')
+    from simplegep.gp_trainers.gp_dp_sgd_trainer import train
     start_train(args, train_fn=train)
 
 def run_gep_cifar10():
@@ -85,6 +92,13 @@ def run_no_dp_putemg():
 def run_dp_sgd_putemg():
     args = parse_args(data_name='putemg', dp_method='dp_sgd')
     from simplegep.trainers.dp_sgd_trainer import train
+    start_train(args, train_fn=train)
+
+
+def run_gp_dp_sgd_putemg():
+    os.environ['USE_GP'] = 'true'
+    args = parse_args(data_name='putemg', dp_method='dp_sgd')
+    from simplegep.gp_trainers.gp_dp_sgd_trainer import train
     start_train(args, train_fn=train)
 
 def sweep_no_dp_putemg():

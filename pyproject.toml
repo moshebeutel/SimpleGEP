@@ -57,6 +57,7 @@ train_dp_sgd_putemg = 'simplegep.main:run_dp_sgd_putemg'
 # sweep
 sweep_no_dp_putemg = 'simplegep.main:sweep_no_dp_putemg'
 sweep_dp_sgd_putemg = 'simplegep.main:sweep_dp_sgd_putemg'
+sweep_gep_putemg = 'simplegep.main:sweep_gep_putemg'
 
 # ****** Toronto UHN Typing Dataset (a.k.a keypressemg)  ******
 # single train

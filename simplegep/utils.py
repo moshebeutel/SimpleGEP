@@ -22,6 +22,7 @@ def add_arguments_keypressemg(parser, project_dir: Path):
 
     parser.add_argument('--log_data_statistics', type=str, default=True)
 
+
     return parser
 
 def add_arguments_putemg(parser, project_dir):
@@ -79,7 +80,7 @@ def parse_args(data_name: str, dp_method: str):
     parser.add_argument('--decrease_shape', default='step', type=str,
                         choices=['linear', 'geometric', 'logarithmic', 'step'])
 
-    parser.add_argument('--clip_strategy', default='median', type=str, choices=['value', 'median', 'max'],
+    parser.add_argument('--clip_strategy', default='value', type=str, choices=['value', 'median', 'max'],
                         help='clip strategy name: value, median, max')
     parser.add_argument('--clip_value', default=100, type=float, help='gradient clipping bound')
     parser.add_argument('--eps', default=8., type=float, help='privacy parameter epsilon')
@@ -96,15 +97,27 @@ def parse_args(data_name: str, dp_method: str):
     parser.add_argument('--stop_embedding_epoch', default=1e10, type=int, help='switch to dp sgd after that epoch')
 
     parser.add_argument('--real_labels', action='store_true', help='use real labels for auxiliary dataset')
-    parser.add_argument('--aux_dataset', default='imagenet', type=str,
-                        help='name of the public dataset, [cifar10, cifar100, imagenet]')
+
     parser.add_argument('--aux_data_size', default=2000, type=int, help='size of the auxiliary dataset')
     parser.add_argument('--wandb', type=bool, default=True, help='enable wandb')
 
-    if (data_name == 'putemg'):
+    if data_name == 'putemg':
         add_arguments_putemg(parser, project_dir=project_dir)
-    elif (data_name == 'keypressemg'):
+        if dp_method == 'gep':
+            # use keypressemg as auxiliary dataset
+            parser.add_argument('--aux_data_root', default=(project_dir / 'data/EMG/keypressemg/CleanData/valid_features_long_npy').as_posix(), type=str,
+                                help='public dataset directory')
+            parser.add_argument('--aux_dataset', default='keypressemg', type=str,
+                                help='name of the public dataset, [keypressemg]')
+    elif data_name == 'keypressemg':
         add_arguments_keypressemg(parser, project_dir=project_dir)
+        if dp_method == 'gep':
+            # use putemg as auxiliary dataset
+            parser.add_argument('--aux_data_root', default=(project_dir / 'data/EMG/putEMG/Data-HDF5-Features-Short-Time').as_posix(), type=str,
+                                help='public dataset directory')
+            parser.add_argument('--aux_dataset', default='putemg', type=str,
+                                help='name of the public dataset, [putemg]')
+
     else:
         assert data_name == 'cifar10', f'Expected cifar10 dataset. Got {data_name}'
         parser.add_argument('--data_root', default=project_dir / 'data/CIFAR10', type=str, help='dataset directory')
@@ -112,6 +125,8 @@ def parse_args(data_name: str, dp_method: str):
 
         if dp_method == 'gep':
             parser.add_argument('--aux_data_root', default=project_dir / 'data/CIFAR10', type=str, help='public dataset directory')
+            parser.add_argument('--aux_dataset', default='imagenet', type=str,
+                                help='name of the public dataset, [cifar100, imagenet]')
 
     args = parser.parse_args()
     return args

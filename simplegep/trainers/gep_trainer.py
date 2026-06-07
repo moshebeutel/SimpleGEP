@@ -86,6 +86,9 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor,
 
 
 def train(args, logger: logging.Logger):
+    gc.collect()
+    torch.cuda.empty_cache()
+
     logger.info(f'Starting training {__file__}')
 
     net = get_model(args)

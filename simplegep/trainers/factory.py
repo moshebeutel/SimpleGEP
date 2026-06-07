@@ -1,3 +1,4 @@
+
 import torch
 
 from simplegep.dp.per_sample_grad import PublicDataPerSampleGradProvider
@@ -46,11 +47,23 @@ def get_public_grads_provider(args, net):
             aux_data_root / 'imagenet_examples_2000')[:num_public_examples]
         assert not args.real_labels, 'Expected use of random labels'
         public_targets = torch.randint(high=args.num_classes, size=(num_public_examples,))
+        pub_data_grads_provider = PublicDataPerSampleGradProvider(public_data=(public_inputs, public_targets), net=net,
+                                                                  public_batchsize=args.batchsize)
+    elif args.aux_dataset == 'keypressemg':
+        from simplegep.data.keypressemg_loader import get_dataloaders
+        import copy
+
+        aux_args = copy.copy(args)
+        aux_args.dataset = args.aux_dataset
+        aux_args.data_root = args.aux_data_root
+        aux_data_loader, _, _ = get_dataloaders(aux_args)
+
+        pub_data_grads_provider = PublicDataPerSampleGradProvider(public_data=aux_data_loader, net=net,
+                                                                  public_batchsize=args.batchsize)
     else:
         raise ValueError(f'Dataset {args.aux_dataset} not supported')
 
-    pub_data_grads_provider = PublicDataPerSampleGradProvider(public_data=(public_inputs, public_targets), net=net,
-                                                              public_batchsize=args.batchsize)
+
 
     return pub_data_grads_provider
 

@@ -1,38 +1,36 @@
-program: dp_sgd_trainer.py
+program: gep_trainer.py
 method: bayes
 metric:
   goal: maximize
   name: val_acc
 parameters:
   batchsize:
-    values: [16, 32, 64, 128]
+    values: [32, 64 ,128]
   num_epochs:
     distribution: int_uniform
-    max: 150
-    min: 10
+    max: 10
+    min: 5
   clip_value:
-    distribution: log_uniform_values
-    max: 100.0
-    min: 1e-1
+    values: [10.0]
   lr:
     distribution: log_uniform_values
-    max: 1e-1
-    min: 1e-3
+    max: 10.0
+    min: 0.1
   weight_decay:
     distribution: uniform
     max: 0.001
     min: 0.0005
   num_basis:
-    distribution: uniform
-    max: 2000
-    min: 500
+    distribution: int_uniform
+    max: 70
+    min: 10
   grads_history_size:
-    distribution: uniform
-    max: 4000
-    min: 2000
+    distribution: int_uniform
+    max: 200
+    min: 100
 
 early_terminate:
   type: hyperband
   s: 2
   eta: 3
-  min_iter: 30
+  min_iter: 3

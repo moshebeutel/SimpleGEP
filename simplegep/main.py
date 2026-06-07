@@ -65,7 +65,7 @@ def sweep_dp_sgd_cifar10():
 
 
 def sweep_gep_cifar10():
-    config_yaml_path = 'simplegep/sweepers/sweep_configurations/sgd_dp_bayes.yaml'
+    config_yaml_path = 'simplegep/sweepers/sweep_configurations/gep_bayes.yaml'
     sweep_configuration, args, logger = prepare_sweep(data_name='cifar10', dp_method='gep',
                                                       config_yaml_path=config_yaml_path)
     from simplegep.trainers.gep_trainer import train
@@ -103,7 +103,14 @@ def sweep_dp_sgd_putemg():
     sweep(sweep_config=sweep_configuration, args=args,
           train_fn=partial(train, logger=logger))
 
+def sweep_gep_putemg():
+    config_yaml_path = 'simplegep/sweepers/sweep_configurations/gep_bayes.yaml'
+    sweep_configuration, args, logger = prepare_sweep(data_name='putemg', dp_method='gep',
+                                                      config_yaml_path=config_yaml_path)
+    from simplegep.trainers.gep_trainer import train
 
+    sweep(sweep_config=sweep_configuration, args=args,
+          train_fn=partial(train, logger=logger))
 
 # UHN Typing Dataset (keypressemg) runners
 def run_no_dp_keypressemg():
@@ -140,7 +147,7 @@ def main():
 
 
 if __name__ == "__main__":
-    run_gep_cifar10()
+    sweep_gep_putemg()
     # run_no_dp_putemg()
     # run_dp_sgd_putemg()
     # run_no_dp_keypressemg()

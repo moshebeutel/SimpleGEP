@@ -175,7 +175,7 @@ def prepare_sweep(data_name, dp_method, config_yaml_path):
         "seed": {"values": [args.seed]}}
     sweep_configuration = load_config(config_path.as_posix())
     sweep_configuration['parameters'].update(seed_parameters)
-    sweep_name = f"eps{args.eps}_epochs{args.num_epochs}_{dp_method.upper()}_{args.dataset.upper()}_seed{args.seed}"
+    sweep_name = f"EPS_{args.eps}_{dp_method.upper()}_{args.dataset.upper()}_seed{args.seed}"
     if args.use_gp:
         sweep_name = f"GP_{sweep_name}"
     sweep_configuration['name'] = sweep_name

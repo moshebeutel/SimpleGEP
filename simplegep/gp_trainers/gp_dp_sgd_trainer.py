@@ -1,57 +1,55 @@
-import gc
-import logging
-from typing import Any, Union, Tuple, List
 import torch
 import wandb
 from tqdm import tqdm
+import gc
 
-from simplegep.dp.dp_params import get_dp_params, DPParams
+from pFedGP.pFedGP.Learner import pFedGPFullLearner
+
+from simplegep.dp.dp_params import get_dp_params
 from simplegep.dp.grads_proc import GradsProcessor
 from simplegep.dp.per_sample_grad import pretrain_actions, backward_pass_get_batch_grads
+from simplegep.gp_trainers.gp_utils import build_tree, eval_model
 from simplegep.models.factory import get_model
-from simplegep.models.utils import initialize_weights, count_parameters, substitute_grads, load_checkpoint, \
-    save_checkpoint
-from simplegep.trainers.factory import get_loss_function, get_optimizer, get_dataloaders
-from simplegep.trainers.utils import eval_model
+from simplegep.models.utils import initialize_weights, count_parameters, load_checkpoint, save_checkpoint, \
+    substitute_grads
+from simplegep.trainers.dp_sgd_trainer import compute_dynamic_dp_params
+from simplegep.trainers.factory import get_optimizer, get_dataloaders
 
 
-def compute_dynamic_dp_params(args, dp_params: DPParams,
-                              start_epoch: Union[int, Any]) -> Tuple[List[float], List[float], List[float], float, str]:
-    from simplegep.dp.dynamic_dp import get_varying_sigma_values, get_decrease_function
-    sigma_decrease_function = get_decrease_function(args)
-    sigma_list, accumulated_epsilon_list, accumulated_epsilon_bar_list, sigma_orig = (
-        get_varying_sigma_values(q=dp_params.sampling_prob,
-                                 n_epoch=args.num_epochs - start_epoch,
-                                 # n_epoch=args.num_epochs,
-                                 eps=args.eps, delta=dp_params.delta,
-                                 initial_sigma_factor=args.dynamic_noise_high_factor,
-                                 final_sigma_factor=args.dynamic_noise_low_factor,
-                                 decrease_func=sigma_decrease_function))
-    return accumulated_epsilon_bar_list, accumulated_epsilon_list, sigma_list, sigma_orig, sigma_decrease_function.__name__
+def train_epoch(net,
+                optimizer,
+                train_loader, grads_processor,
+                GP):
 
-def train_epoch(net, loss_function, optimizer, train_loader, grads_processor):
-    train_loss, train_acc, correct, total, batch_idx = 0.0, 0.0, 0, 0, 0
-    all_correct = []
+    # build tree at each step
+    GP, label_map, _, __ = build_tree(net, train_loader, GP)
+    GP.train()
     net.train()
+    running_loss, running_correct, running_samples = 0., 0., 0.
     pbar = tqdm(enumerate(train_loader), total=len(train_loader))
     for batch_idx, (inputs, targets) in pbar:
         inputs, targets = inputs.cuda(), targets.cuda()
         optimizer.zero_grad()
 
-        # forward pass
+        # forward prop
         outputs = net(inputs)
-        loss = loss_function(outputs, targets)
-        step_loss = loss.item()
-        step_loss /= inputs.shape[0]
-        train_loss += step_loss
-        _, predicted = torch.max(outputs.data, 1)
-        total += targets.size(0)
-        correct_idx = predicted.eq(targets.data).cpu()
-        all_correct += correct_idx.numpy().tolist()
-        correct += correct_idx.sum()
-        batch_acc = correct_idx.sum() / targets.size(0)
 
-        # get per sample grads
+        X = torch.cat((X, outputs), dim=0) if batch_idx > 0 else outputs
+        Y = torch.cat((Y, targets), dim=0) if batch_idx > 0 else targets
+        batch_size = Y.shape[0]
+
+        batch_correct = outputs.argmax(1).eq(Y).sum().item()
+        running_correct += batch_correct
+        running_samples += batch_size
+        batch_acc = batch_correct / batch_size
+
+        offset_labels = torch.tensor([label_map[l.item()] for l in Y], dtype=Y.dtype,
+                                     device=Y.device)
+
+        loss = GP(X, offset_labels, to_print=1)
+        # loss *= args.loss_scaler
+        running_loss += loss.item() * offset_labels.shape[0]
+
         flat_per_sample_grads = backward_pass_get_batch_grads(batch_loss=loss, net=net)
 
         # perturb grads
@@ -60,10 +58,9 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor):
         # substitute perturbed grads
         substitute_grads(net, processed_grads)
 
-        # update net parameters
         optimizer.step()
 
-        pbar.set_description(f'Batch {batch_idx}/{len(train_loader)} train batch loss {step_loss:.2f}'
+        pbar.set_description(f'Batch {batch_idx}/{len(train_loader)} train batch loss {loss.item():.2f}'
                              f' train accuracy {batch_acc:.2f}')
 
         # free gpu memory
@@ -74,25 +71,20 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor):
         gc.collect()
         torch.cuda.empty_cache()
 
-    train_acc = 100. * float(correct) / float(total)
-    train_loss = train_loss / batch_idx
+    train_acc = 100. * float(running_correct) / float(running_samples)
+    train_loss = running_loss / running_samples
 
     return train_loss, train_acc
 
 
 def train(args, logger: logging.Logger):
     logger.info(f'Starting training {__file__}')
-
+    GP = pFedGPFullLearner(args, args.num_classes)
     net = get_model(args)
     initialize_weights(net)
     num_params, layer_sizes = count_parameters(model=net, return_layer_sizes=True)
     logger.debug(f'Model set to {args.model_name} num params {num_params}')
     logger.debug(f'layer sizes: {layer_sizes}')
-
-    # reduction = 'sum' if args.private else 'mean'
-    reduction = 'sum'
-    loss_function = get_loss_function(args.loss_function, reduction=reduction)
-    logger.debug(f'loss function set to {args.loss_function} reduction {reduction}')
 
     best_val_acc = 0.0
     start_epoch = 0
@@ -103,7 +95,7 @@ def train(args, logger: logging.Logger):
         assert args.seed == seed, f'Expected checkpoint seed equals session seed. Got {seed} != {args.seed}'
         logger.info(f'Loaded checkpoint {args.checkpoint} with epoch {start_epoch} best acc {best_val_acc}')
 
-    net, loss_function = pretrain_actions(model=net, loss_func=loss_function)
+    net = pretrain_actions(model=net)
     logger.debug('model and loss functions prepared for per sample grads')
     net = net.cuda()
 
@@ -158,11 +150,11 @@ def train(args, logger: logging.Logger):
 
     for epoch in range(start_epoch, num_epochs):
         logger.info(f'***** Starting epoch {epoch}  ******')
-        train_loss, train_acc = train_epoch(net=net, loss_function=loss_function, optimizer=optimizer,
-                                            train_loader=train_loader, grads_processor=grads_processor)
+        train_loss, train_acc = train_epoch(net=net, optimizer=optimizer,
+                                            train_loader=train_loader, grads_processor=grads_processor, GP=GP)
         logger.info(f'Epoch {epoch}/{args.num_epochs} train loss {train_loss:.2f} train accuracy {train_acc:.2f}')
-        val_loss, val_acc = eval_model(net=net, loss_function=loss_function, loader=val_loader)
-        logger.info(f'Epoch {epoch}/{args.num_epochs} test loss {val_loss:.2f} test accuracy {val_acc:.2f}')
+        val_loss, val_acc = eval_model(net=net, train_loader=train_loader, eval_loader=val_loader, GP=GP)
+        logger.info(f'Epoch {epoch}/{args.num_epochs} val loss {val_loss:.2f} val accuracy {val_acc:.2f}')
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             checkpoint_name = save_checkpoint(net=net,
@@ -188,7 +180,7 @@ def train(args, logger: logging.Logger):
 
 
     load_checkpoint(checkpoint_path=checkpoint_name, net=net, optimizer=None)
-    test_loss, test_acc = eval_model(net=net, loss_function=loss_function, loader=test_loader)
+    test_loss, test_acc = eval_model(net=net, train_loader=train_loader, eval_loader=val_loader, GP=GP)
     logger.info(f'Final test loss {test_loss:.2f} test accuracy {test_acc:.2f}')
     if args.wandb:
         wandb.log({'test_loss': test_loss, 'test_acc': test_acc})

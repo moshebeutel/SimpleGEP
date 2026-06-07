@@ -8,11 +8,12 @@ from torch.utils.data import DataLoader, TensorDataset
 from simplegep.dp.utils import flatten_tensor
 
 
-def pretrain_actions(model, loss_func):
+def pretrain_actions(model, loss_func=None):
     model = extend(model)
-    loss_func = extend(loss_func)
-    return model, loss_func
-
+    if loss_func is not None:
+        loss_func = extend(loss_func)
+        return model, loss_func
+    return model
 
 def backward_pass_get_batch_grads(batch_loss: torch.Tensor, net: torch.nn.Module) -> torch.Tensor:
     grad_batch_list = []

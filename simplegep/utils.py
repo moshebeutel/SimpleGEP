@@ -42,7 +42,8 @@ def add_arguments_putemg(parser, project_dir):
     parser.add_argument('--log_data_statistics', type=str, default=False)
 
 def parse_args(data_name: str, dp_method: str):
-    use_gp = False
+    import os
+    use_gp = os.environ.get('USE_GP', 'False')
     session_name = f"{'GP_' if use_gp else ''}{data_name.upper()}_DP_{dp_method.upper()}"
     parser = argparse.ArgumentParser(description=session_name)
     project_dir = Path(__file__).resolve().parent
@@ -100,6 +101,10 @@ def parse_args(data_name: str, dp_method: str):
 
     parser.add_argument('--aux_data_size', default=2000, type=int, help='size of the auxiliary dataset')
     parser.add_argument('--wandb', type=bool, default=True, help='enable wandb')
+
+    if use_gp:
+        from simplegep.gp_trainers import gp_utils
+        parser = gp_utils.add_arguments_gp(parser)
 
     if data_name == 'putemg':
         add_arguments_putemg(parser, project_dir=project_dir)

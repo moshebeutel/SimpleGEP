@@ -149,10 +149,10 @@ def main():
 
 
 if __name__ == "__main__":
-    sweep_gep_putemg()
+    # sweep_gep_putemg()
     # run_no_dp_putemg()
     # run_dp_sgd_putemg()
     # run_no_dp_keypressemg()
-    # run_dp_sgd_keypressemg()
+    run_dp_sgd_keypressemg()
 
 

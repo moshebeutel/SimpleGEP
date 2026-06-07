@@ -14,20 +14,20 @@ parameters:
     values: [10.0]
   lr:
     distribution: log_uniform_values
-    max: 10.0
-    min: 0.1
+    max: 0.1
+    min: 0.01
   weight_decay:
     distribution: uniform
     max: 0.001
     min: 0.0005
   num_basis:
     distribution: int_uniform
-    max: 70
-    min: 10
+    max: 2000
+    min: 500
   grads_history_size:
     distribution: int_uniform
-    max: 200
-    min: 100
+    max: 2500
+    min: 2000
 
 early_terminate:
   type: hyperband

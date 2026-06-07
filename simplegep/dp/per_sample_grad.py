@@ -30,9 +30,10 @@ def backward_pass_get_batch_grads(batch_loss: torch.Tensor, net: torch.nn.Module
     flat_grad_batch_tensor = flatten_tensor(grad_batch_list)
 
     grad_batch_list = [t.detach().cpu() for t in grad_batch_list]
-    grad_batch_list = None
     del grad_batch_list
-
+    grad_batch_list = None
+    gc.collect()
+    torch.cuda.empty_cache()
     return flat_grad_batch_tensor
 
 
@@ -61,6 +62,12 @@ class PublicDataPerSampleGradProvider:
             batch_loss = self.net(batch).mean()
             grad_batch = backward_pass_get_batch_grads(batch_loss, self.net)
             grad_batch_list.append(grad_batch)
+
+
+            del batch_loss, batch
+            batch, batch_loss = None, None
+            gc.collect()
+            torch.cuda.empty_cache()
         flat_grad_batch_tensor = torch.cat(grad_batch_list)
         self.net.load_state_dict(current_state_dict)
         return flat_grad_batch_tensor

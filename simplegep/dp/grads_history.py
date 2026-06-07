@@ -15,13 +15,18 @@ class GradsContainer:
         assert grad.dim() == 2, f'Expected grads with dim==2, got {grad.dim()}'
         assert grad.shape[1] == self.grads_numel, f'Expected grads with shape[1]=={self.grads_numel}, got {grad.shape[1]}'
 
-        added_grads = grad.shape[0]
+        added_grads_size = grad.shape[0]
+        expected_size = self._current_size + added_grads_size
+        if expected_size > self.container_size:
+            size_to_remove = expected_size - self.container_size
+            self._grads = self._grads[size_to_remove:]
 
         self._grads = grad if self._grads is None else torch.cat([self._grads, grad], dim=0)
-        assert (self._current_size + added_grads) == self._grads.shape[0], f'Added {added_grads} grads, expected {self._current_size + added_grads} grads, got {self._grads.shape[0]}'
+        # assert (self._current_size + added_grads_size) == self._grads.shape[0], f'Added {added_grads_size} grads, expected {self._current_size + added_grads_size} grads, got {self._grads.shape[0]}'
+        assert self._grads.shape[0] <= self.container_size, f'Expected grads number not exceed {self.container_size}. Got {self._grads.shape[0]}'
 
-        if self._grads.shape[0] > self.container_size:
-            self._grads = self._grads[-self.container_size:]
+        # if self._grads.shape[0] > self.container_size:
+        #     self._grads = self._grads[-self.container_size:]
 
         self._current_size = self._grads.shape[0]
 

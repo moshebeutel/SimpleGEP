@@ -19,12 +19,14 @@ def start_train(args, train_fn):
     set_seed(args.seed)
     with wandb.init(project='GEP', name=args.sess):
         wandb.config.update(vars(args))
-        wandb.run.name = '_'.join([f'{k}_{getattr(args, k)}'.upper() for k in ['dp_method',
-                                                                               'model_name',
-                                                                               'dataset',
-                                                                               'eps', 'dynamic_noise',
-                                                                               'optimizer', 'lr', 'batchsize']])
-        train_fn(args, logger)
+        run_name_fields = ['dp_method', 'dataset', 'eps', 'lr', 'batchsize', 'dynamic_noise']
+        if args.dp_method == 'gep':
+            run_name_fields.extend(['num_basis', 'grads_history_size'])
+        wandb.run.name = '_'.join([f'{k}_{getattr(args, k)}'.upper() for k in run_name_fields])
+        try:
+            train_fn(args, logger)
+        except Exception as e:
+            logger.error(f'Error in training during sweep: {e}')
 
 
 

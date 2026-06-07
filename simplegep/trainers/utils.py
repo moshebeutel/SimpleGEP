@@ -14,7 +14,51 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+import gc
+import torch
 
+
+def clear_cuda_from_namespace(namespace: dict, verbose: bool = True):
+    cleared = []
+
+    for name, value in list(namespace.items()):
+        if name.startswith("__"):
+            continue
+
+        try:
+            if torch.is_tensor(value) and value.is_cuda:
+                namespace[name] = None
+                cleared.append(name)
+
+            elif isinstance(value, torch.nn.Module):
+                value.zero_grad(set_to_none=True)
+                value.cpu()
+                namespace[name] = None
+                cleared.append(name)
+
+            elif isinstance(value, torch.optim.Optimizer):
+                for group in value.param_groups:
+                    for param in group.get("params", []):
+                        if param is not None:
+                            param.grad = None
+
+                value.state.clear()
+                namespace[name] = None
+                cleared.append(name)
+
+        except Exception:
+            pass
+
+    gc.collect()
+
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+
+    if verbose:
+        print(f"Cleared names: {cleared}")
+
+    return cleared
 @torch.no_grad()
 def eval_model(net, loss_function, loader):
     net.eval()

@@ -16,7 +16,7 @@ from simplegep.models.factory import get_model
 from simplegep.models.utils import initialize_weights, count_parameters, substitute_grads, load_checkpoint, \
 save_checkpoint
 from simplegep.trainers.factory import get_loss_function, get_optimizer, get_dataloaders, get_public_grads_provider
-from simplegep.trainers.utils import eval_model
+from simplegep.trainers.utils import eval_model, clear_cuda_from_namespace
 
 
 def train_epoch(net, loss_function, optimizer, train_loader, grads_processor,
@@ -78,6 +78,11 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor,
         del inputs, targets, outputs, loss
         gc.collect()
         torch.cuda.empty_cache()
+
+    del pub_grads
+    pub_grads = None
+    gc.collect()
+    torch.cuda.empty_cache()
 
     train_acc = 100. * float(correct) / float(total)
     train_loss = train_loss / batch_idx
@@ -192,10 +197,16 @@ def train(args, logger: logging.Logger):
 
     for epoch in range(start_epoch, num_epochs):
         logger.info(f'***** Starting epoch {epoch}  ******')
-        train_loss, train_acc = train_epoch(net=net, loss_function=loss_function, optimizer=optimizer,
+        try:
+            train_loss, train_acc = train_epoch(net=net, loss_function=loss_function, optimizer=optimizer,
                                             train_loader=train_loader, grads_processor=grads_processor,
                                             embedder=embedder, pub_data_grads_provider=pub_data_grads_provider,
                                             grads_history_container=grads_history_container)
+        except RuntimeError as e:
+            logger.error(f'Runtime error in gep_trainer.train. Epoch: {epoch} Error: {e}')
+            clear_cuda_from_namespace(globals())
+            raise e
+
         logger.info(f'Epoch {epoch}/{args.num_epochs} train loss {train_loss:.2f} train accuracy {train_acc:.2f}')
         val_loss, val_acc = eval_model(net=net, loss_function=loss_function, loader=val_loader)
         logger.info(f'Epoch {epoch}/{args.num_epochs} test loss {val_loss:.2f} test accuracy {val_acc:.2f}')
@@ -223,6 +234,8 @@ def train(args, logger: logging.Logger):
     if args.wandb:
         wandb.log({'test_loss': test_loss, 'test_acc': test_acc})
         wandb.finish()
+
+    clear_cuda_from_namespace(globals())
 
     return best_val_acc, checkpoint_name
 

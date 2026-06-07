@@ -316,7 +316,7 @@ def loop_for_sigma(q, T, eps, delta, cur_sigma, interval, rdp_orders=32, rgp=Tru
 
 ## interval: init search inerval
 ## rgp: use residual gradient perturbation or not
-def get_sigma(q, T, eps, delta, init_sigma=10, interval=1., rgp=True):
+def get_sigma(q, T, eps, delta, init_sigma=100, interval=1., rgp=True):
   cur_sigma = init_sigma
 
   cur_sigma, _ = loop_for_sigma(q, T, eps, delta, cur_sigma, interval, rgp=rgp)
@@ -325,3 +325,17 @@ def get_sigma(q, T, eps, delta, init_sigma=10, interval=1., rgp=True):
   interval /= 10
   cur_sigma, previous_eps = loop_for_sigma(q, T, eps, delta, cur_sigma, interval, rgp=rgp)
   return cur_sigma, previous_eps
+
+
+
+if __name__ == "__main__":
+  batchsize = 512
+  num_training_samples = 100_000
+  num_epochs = 1000
+  epsilon = 1
+  sampling_prob: float = batchsize / num_training_samples
+  steps: int = int(num_epochs / sampling_prob)
+  delta: float = 1 / num_training_samples
+  print("sampling_prob: {}, steps: {}, delta: {}".format(sampling_prob, steps, delta))
+  sigma, eps = get_sigma(sampling_prob, steps, epsilon, delta, rgp=False)
+  print("sigma: {}, eps: {}".format(sigma, eps))

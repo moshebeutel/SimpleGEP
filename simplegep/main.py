@@ -1,12 +1,8 @@
 import os
 from functools import partial
-import wandb
 
 from simplegep.sweepers.sweep import prepare_sweep, sweep
 from simplegep.utils import parse_args, set_logger, set_seed
-
-
-
 
 
 def init_logger(args):
@@ -16,6 +12,7 @@ def init_logger(args):
     return logger
 
 def start_train(args, train_fn):
+    import wandb
     logger = init_logger(args)
     set_seed(args.seed)
     with wandb.init(project='GEP', name=args.sess):
@@ -166,7 +163,8 @@ if __name__ == "__main__":
     # sweep_gep_putemg()
     # run_no_dp_putemg()
     # run_dp_sgd_putemg()
+    run_gp_dp_sgd_putemg()
     # run_no_dp_keypressemg()
-    run_dp_sgd_keypressemg()
+    # run_dp_sgd_keypressemg()
 
 

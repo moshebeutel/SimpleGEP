@@ -23,59 +23,63 @@ def train_epoch(net,
                 GP):
 
     # build tree at each step
+    net.train()
     GP, label_map, _, __ = build_tree(net, train_loader, GP)
     GP.train()
-    net.train()
+    optimizer.zero_grad()
     running_loss, running_correct, running_samples = 0., 0., 0.
     pbar = tqdm(enumerate(train_loader), total=len(train_loader))
     for batch_idx, (inputs, targets) in pbar:
         inputs, targets = inputs.cuda(), targets.cuda()
-        optimizer.zero_grad()
 
         # forward prop
         outputs = net(inputs)
 
         X = torch.cat((X, outputs), dim=0) if batch_idx > 0 else outputs
         Y = torch.cat((Y, targets), dim=0) if batch_idx > 0 else targets
-        batch_size = Y.shape[0]
 
-        batch_correct = outputs.argmax(1).eq(Y).sum().item()
-        running_correct += batch_correct
-        running_samples += batch_size
-        batch_acc = batch_correct / batch_size
-
-        offset_labels = torch.tensor([label_map[l.item()] for l in Y], dtype=Y.dtype,
-                                     device=Y.device)
-
-        loss = GP(X, offset_labels, to_print=1)
-        # loss *= args.loss_scaler
-        running_loss += loss.item() * offset_labels.shape[0]
-
-        flat_per_sample_grads = backward_pass_get_batch_grads(batch_loss=loss, net=net)
-
-        # perturb grads
-        processed_grads = grads_processor.process_grads(flat_per_sample_grads).squeeze()
-
-        # substitute perturbed grads
-        substitute_grads(net, processed_grads)
-
-        optimizer.step()
-
-        pbar.set_description(f'Batch {batch_idx}/{len(train_loader)} train batch loss {loss.item():.2f}'
-                             f' train accuracy {batch_acc:.2f}')
+        running_samples += targets.shape[0]
 
         # free gpu memory
-        inputs, targets, outputs, loss = (inputs.detach().cpu(), targets.detach().cpu(),
-                                          outputs.detach().cpu(), loss.detach().cpu())
-        inputs, targets, outputs, loss = None, None, None, None
-        del inputs, targets, outputs, loss
+        inputs, targets, outputs = (inputs.detach().cpu(), targets.detach().cpu(), outputs.detach().cpu())
+        inputs, targets, outputs = None, None, None
+        del inputs, targets, outputs
         gc.collect()
         torch.cuda.empty_cache()
 
-    train_acc = 100. * float(running_correct) / float(running_samples)
+        pbar.set_description(f'Batch {batch_idx}/{len(train_loader)}')
+
+    offset_labels = torch.tensor([label_map[l.item()] for l in Y], dtype=Y.dtype,
+                                 device=Y.device)
+
+    loss = GP(X, offset_labels, to_print=1)
+    # loss *= args.loss_scaler
+    running_loss += loss.item() * offset_labels.shape[0]
+
+    flat_per_sample_grads = backward_pass_get_batch_grads(batch_loss=loss, net=net)
+
+    # perturb grads
+    processed_grads = grads_processor.process_grads(flat_per_sample_grads).squeeze()
+
+    # substitute perturbed grads
+    substitute_grads(net, processed_grads)
+
+    optimizer.step()
+
+
+    # free gpu memory
+    offset_labels, processed_grads, flat_per_sample_grads, loss = (offset_labels.detach().cpu(),
+                                                                   processed_grads.detach().cpu(),
+                                                                   flat_per_sample_grads.detach().cpu(),
+                                                                   loss.detach().cpu())
+    offset_labels, processed_grads, flat_per_sample_grads, loss = None, None, None, None
+    del  offset_labels, processed_grads, flat_per_sample_grads, loss
+    gc.collect()
+    torch.cuda.empty_cache()
+
     train_loss = running_loss / running_samples
 
-    return train_loss, train_acc
+    return train_loss
 
 
 def train(args, logger: logging.Logger):
@@ -151,9 +155,9 @@ def train(args, logger: logging.Logger):
 
     for epoch in range(start_epoch, num_epochs):
         logger.info(f'***** Starting epoch {epoch}  ******')
-        train_loss, train_acc = train_epoch(net=net, optimizer=optimizer,
+        train_loss = train_epoch(net=net, optimizer=optimizer,
                                             train_loader=train_loader, grads_processor=grads_processor, GP=GP)
-        logger.info(f'Epoch {epoch}/{args.num_epochs} train loss {train_loss:.2f} train accuracy {train_acc:.2f}')
+        logger.info(f'Epoch {epoch}/{args.num_epochs} train loss {train_loss:.2f}')
         val_loss, val_acc = eval_model(net=net, train_loader=train_loader, eval_loader=val_loader, GP=GP)
         logger.info(f'Epoch {epoch}/{args.num_epochs} val loss {val_loss:.2f} val accuracy {val_acc:.2f}')
         if val_acc > best_val_acc:
@@ -166,7 +170,7 @@ def train(args, logger: logging.Logger):
                                               sess=args.sess)
             logger.info(f'Best Acc = {best_val_acc}. Checkpoint {checkpoint_name} saved!')
         if args.wandb:
-            wandb.log({'train_loss': train_loss, 'train_acc': train_acc, 'val_loss': val_loss,
+            wandb.log({'train_loss': train_loss, 'val_loss': val_loss,
                        'val_acc': val_acc, 'best_val_acc': best_val_acc,
                        'sigma': sigma_list[epoch-start_epoch]}, step=epoch)
             if args.dynamic_noise:

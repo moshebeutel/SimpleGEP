@@ -1,38 +1,16 @@
-import copy
-from collections import defaultdict
-from typing import Dict
-import numpy as np
 import torch
-from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
-# from fed_trainers.trainers.utils import detach_to_numpy, get_device
-# from fed_trainers.trainers.factory import get_optimizer, get_logger
 
 
 @torch.no_grad()
 def eval_model(net, train_loader, eval_loader, GP):
     net.eval()
-    eval_loss = 0
-    correct = 0
-    total = 0
-    all_correct = []
     GP, label_map, Y_train, X_train = build_tree(net, train_loader, GP)
 
-    # # results: defaultdict[int, defaultdict[str, float]] = defaultdict()
-    # results = defaultdict(lambda: defaultdict(list))
-
-    targets = []
-    preds = []
-    step_results = []
     is_first_iter = True
     running_loss, running_correct, running_samples = 0., 0., 0.
 
-
-    # build tree at each step
-
     GP.eval()
-    # data_labels = []
-    # data_preds = []
     with torch.no_grad():
         pbar = tqdm(enumerate(eval_loader), total=len(eval_loader))
         for batch_idx, (inputs, targets) in pbar:
@@ -50,45 +28,10 @@ def eval_model(net, train_loader, eval_loader, GP):
             batch_acc = batch_correct / batch_size
 
             is_first_iter = False
-            targets.append(Y_test)
-            preds.append(pred)
 
-            # data_labels.append(Y_test)
-            # data_preds.append(pred)
             pbar.set_description(f'Batch {batch_idx}/{len(eval_loader)} eval batch loss {loss.item():.2f}'
                                  f' eval accuracy {batch_acc:.2f}')
 
-    # # calculate confusion matrix
-    # cm = confusion_matrix(detach_to_numpy(torch.cat(data_labels, dim=0)),
-    #                       detach_to_numpy(torch.max(torch.cat(data_preds, dim=0), dim=1)[1]))
-    #
-    # # save classification results to output structure
-    # step_results.append({"cm": cm,
-    #                      "y_true": detach_to_numpy(torch.cat(data_labels, dim=0)),
-    #                      "y_pred": detach_to_numpy(torch.max(torch.cat(data_preds, dim=0), dim=1)[1])})
-    #
-    # # erase tree (no need to save it)
-    # GP.tree = None
-    #
-    # results['loss'] = running_loss / running_samples
-    # results['correct'] = running_correct
-    # results['total'] = running_samples
-    #
-    # target = detach_to_numpy(torch.cat(targets, dim=0))
-    # full_pred = detach_to_numpy(torch.cat(preds, dim=0))
-    # labels_vs_preds = np.concatenate((target.reshape(-1, 1), full_pred), axis=1)
-    #
-    # # =============================
-    # # GLOBAL TOTALS (across clients)
-    # # =============================
-    # # Concatenate all true labels and prediction scores
-    # y_true_all_t = torch.cat(targets, dim=0)  # tensor on device
-    # y_prob_all_t = torch.cat(preds, dim=0)  # tensor on device
-    #
-    # # Convert to numpy
-    # y_true_all = detach_to_numpy(y_true_all_t)  # shape: [N]
-    # y_prob_all = detach_to_numpy(y_prob_all_t)  # shape: [N, C]
-    # y_pred_all = y_prob_all.argmax(axis=1)  # shape: [N]
 
     eval_loss = running_loss / running_samples
     eval_acc = 100. * running_correct / running_samples

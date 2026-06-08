@@ -25,14 +25,11 @@ def initialize_weights(module: nn.Module):
 
 
 def count_parameters(model, return_layer_sizes=False):
-    if not return_layer_sizes:
-        return sum(p.numel() for p in model.parameters() if p.requires_grad)
-    else:
-        layer_sizes = []
-        for name, param in model.named_parameters():
-            if param.requires_grad:
-                layer_sizes.append(param.numel())
-        return sum(layer_sizes), layer_sizes
+    relevant_params = [p for (n,p) in model.named_parameters() if p.requires_grad and 'batch_norm' not in n]
+    layer_sizes = [p.numel() for p in relevant_params]
+    sum_params = sum(layer_sizes)
+    return sum_params if not return_layer_sizes else sum_params, layer_sizes
+
 
 
 def substitute_grads(net, grads):

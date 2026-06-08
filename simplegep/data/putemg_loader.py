@@ -7,7 +7,7 @@ import psutil
 import torch
 from torch.utils.data import random_split
 
-from simplegep.utils import set_logger
+from simplegep.utils import set_logger, parse_args
 
 
 def get_user_list():
@@ -70,6 +70,9 @@ def get_features() -> List[Any]:
 def get_dataloaders(args):
     import pandas as pd
     from biolab_utilities.putemg_utilities import prepare_data, Record, record_filter, data_per_id_and_date
+    import time
+
+    get_dataloaders_start_time = time.perf_counter()
 
     logger = set_logger(logger_name=args.sess, log_dir=args.log_root, level=args.log_level)
 
@@ -86,6 +89,8 @@ def get_dataloaders(args):
     #              for f in sorted(calculated_features_folder.glob("*_features.hdf5"))]
     all_files = [f.as_posix().replace('_filtered', '')
                  for f in sorted(calculated_features_folder.glob("*_filtered.hdf5"))]
+
+    after_all_files_time = time.perf_counter()
 
     users_files = []
     users = get_user_list()
@@ -117,13 +122,12 @@ def get_dataloaders(args):
 
     for r in records_filtered_by_subject:
         logger.debug(f'Loading {r.path}')
-        logger.debug(f"CPU usage: {psutil.cpu_percent(interval=1)}")
-        logger.debug(f"RAM usage: {psutil.virtual_memory().percent}%")
         filename = os.path.splitext(r.path)[0]
-        #TODO: remove this
-        if filename == 'features_short_time_emg_gestures-10-sequential-2018-04-05-10-14-14-029':
-            continue
+        # if filename == 'features_short_time_emg_gestures-10-sequential-2018-04-05-10-14-14-029':
+        #     continue
         dfs[r] = pd.DataFrame(pd.read_hdf(os.path.join(calculated_features_folder, filename + '_filtered.hdf5')))
+
+    after_df_load_time = time.perf_counter()
 
     features = get_features()
 
@@ -165,6 +169,8 @@ def get_dataloaders(args):
     train_x_list, test_x_list = [], []
     train_y_list, test_y_list = [], []
 
+    global_start_time = time.perf_counter()
+    run_time_per_client = {id: {} for id in range(num_clients)}
     # for id in range(num_clients // 2):
     for id in trange(num_clients):
         train_x_s, test_x_s = [], []
@@ -174,6 +180,8 @@ def get_dataloaders(args):
         # iterate over each internal data
         client_id = id
         for i_s, subject_data in enumerate(list(splits_all.values())[client_id]):
+            inner_loop_start_time = time.perf_counter()
+
             # get data of client
             # prepare training and testing set based on combination of k-fold split, feature set and gesture set
             # this is also where gesture transitions are deleted from training and test set
@@ -245,6 +253,9 @@ def get_dataloaders(args):
             train_y_s.append(train_y)
             test_y_s.append(test_y_true)
 
+            inner_loop_elapsed_time = time.perf_counter() - inner_loop_start_time
+            run_time_per_client[client_id][i_s] = inner_loop_elapsed_time
+
             logger.debug(f'Train data list length: {len(train_x_s)}')
             logger.debug(f'Test data list length: {len(test_x_s)}')
 
@@ -278,27 +289,43 @@ def get_dataloaders(args):
         #     batch_size=args.batch_size,
         #     num_workers=args.num_workers
         # )
-
+    after_loops = time.perf_counter()
+    global_elapsed_time = after_loops - global_start_time
 
     dataset_x = torch.cat(train_x_list, dim=0)
     dataset_y = torch.cat(train_y_list, dim=0)
     dataset = torch.utils.data.TensorDataset(dataset_x, dataset_y)
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
-    logger.info(f'Train data list length: {len(train_dataset)}')
-    logger.info(f'Val data list length: {len(val_dataset)}')
+    # logger.info(f'Train data list length: {len(train_dataset)}')
+    # logger.info(f'Val data list length: {len(val_dataset)}')
 
     test_x = torch.cat(test_x_list, dim=0)
     test_y_true = torch.cat(test_y_list, dim=0)
     test_dataset = torch.utils.data.TensorDataset(test_x, test_y_true)
-    logger.info(f'Test data list length: {len(test_dataset)}')
+    # logger.info(f'Test data list length: {len(test_dataset)}')
 
     train_loader = torch.utils.data.DataLoader(train_dataset, shuffle=True, batch_size=args.batchsize, num_workers=2)
     val_loader = torch.utils.data.DataLoader(val_dataset, shuffle=False, batch_size=args.batchsize, num_workers=2)
     test_loader = torch.utils.data.DataLoader(test_dataset, shuffle=False, batch_size=args.batchsize, num_workers=2)
 
-    logger.info(f'Train data loader length: {len(train_loader)}')
-    logger.info(f'Val data loader length: {len(val_loader)}')
-    logger.info(f'Test data loader length: {len(test_loader)}')
+    # logger.info(f'Train data loader length: {len(train_loader)}')
+    # logger.info(f'Val data loader length: {len(val_loader)}')
+    # logger.info(f'Test data loader length: {len(test_loader)}')
+
+    aggergated_elapsed_time = time.perf_counter() - after_loops
+
+    logger.info(f'All files loading time: {after_all_files_time - get_dataloaders_start_time:.4f} seconds')
+    logger.info(f'Data loading time: {after_df_load_time - after_all_files_time:.4f} seconds')
+    for client_id in run_time_per_client:
+        for i_s in run_time_per_client[client_id]:
+            logger.info(f'Client {client_id} subject {i_s}: {run_time_per_client[client_id][i_s]:.4f} seconds')
+    logger.info(f'Global runtime: {global_elapsed_time:.4f} seconds')
+    logger.info(f'Aggregated runtime: {aggergated_elapsed_time:.4f} seconds')
 
     return train_loader, val_loader, test_loader
+
+if __name__ == '__main__':
+    args = parse_args(data_name='putemg', dp_method='dp_sgd')
+    # args.log_level = 'DEBUG'
+    dataloaders = get_dataloaders(args)

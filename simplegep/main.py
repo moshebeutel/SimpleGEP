@@ -106,7 +106,7 @@ def sweep_dp_sgd_putemg():
           train_fn=partial(train, logger=logger))
 
 def sweep_gep_putemg():
-    config_yaml_path = 'simplegep/sweepers/sweep_configurations/gep_bayes.yaml'
+    config_yaml_path = 'simplegep/sweepers/sweep_configurations/gep_grid.yaml'
     sweep_configuration, args, logger = prepare_sweep(data_name='putemg', dp_method='gep',
                                                       config_yaml_path=config_yaml_path)
     from simplegep.trainers.gep_trainer import train

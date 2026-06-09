@@ -38,7 +38,7 @@ def backward_pass_get_batch_grads(batch_loss: torch.Tensor, net: torch.nn.Module
 
 
 class PublicDataPerSampleGradProvider:
-    def __init__(self, public_data, net:nn.Module, public_batchsize: int = 256):
+    def __init__(self, public_data, net:nn.Module, public_batchsize: int = 256, num_samples: int = 1024):
         if isinstance(public_data, DataLoader):
             self._public_data_loader = public_data
         elif isinstance(public_data, tuple):
@@ -52,20 +52,27 @@ class PublicDataPerSampleGradProvider:
         else:
             raise ValueError('public_data must be either torch.Tensor or torch.utils.data.DataLoader')
         self.net = copy.deepcopy(net)
+        self.num_samples = num_samples
 
     def get_grads(self, current_state_dict: dict):
         self.net.load_state_dict(current_state_dict)
         self.net.train()
         grad_batch_list = []
+        num_samples_aggegated = 0
         for batch in self._public_data_loader:
             batch = batch[0].cuda()
-            batch_loss = self.net(batch).mean()
-            grad_batch = backward_pass_get_batch_grads(batch_loss, self.net)
-            grad_batch_list.append(grad_batch)
+            if num_samples_aggegated <= self.num_samples:
+                batch_loss = self.net(batch).mean()
+                grad_batch = backward_pass_get_batch_grads(batch_loss, self.net)
+                grad_batch_list.append(grad_batch)
+                batch_size = batch[0].shape[0]
+                num_samples_aggegated += batch_size
+                batch_loss = None
+                del batch_loss
 
 
-            del batch_loss, batch
-            batch, batch_loss = None, None
+            batch = None
+            del batch
             gc.collect()
             torch.cuda.empty_cache()
         flat_grad_batch_tensor = torch.cat(grad_batch_list)

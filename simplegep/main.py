@@ -125,6 +125,12 @@ def run_dp_sgd_keypressemg():
     from simplegep.trainers.dp_sgd_trainer import train
     start_train(args, train_fn=train)
 
+def run_gep_keypressemg():
+    args = parse_args(data_name='keypressemg', dp_method='gep')
+    args.batchsize = 1024
+    from simplegep.trainers.gep_trainer import train
+    start_train(args, train_fn=train)
+
 def sweep_no_dp_keypressemg():
     config_yaml_path = 'simplegep/sweepers/sweep_configurations/sgd_dp_bayes.yaml'
     sweep_configuration, args, logger = prepare_sweep(data_name='keypressemg', dp_method='no_dp',
@@ -143,14 +149,24 @@ def sweep_dp_sgd_keypressemg():
     sweep(sweep_config=sweep_configuration, args=args,
           train_fn=partial(train, logger=logger))
 
+def sweep_gep_keypressemg():
+    config_yaml_path = 'simplegep/sweepers/sweep_configurations/gep_grid.yaml'
+    sweep_configuration, args, logger = prepare_sweep(data_name='keypressemg', dp_method='gep',
+                                                      config_yaml_path=config_yaml_path)
+    from simplegep.trainers.gep_trainer import train
+
+    sweep(sweep_config=sweep_configuration, args=args,
+          train_fn=partial(train, logger=logger))
+
 
 def main():
     run_no_dp_cifar10()
 
 
 if __name__ == "__main__":
+    run_gep_keypressemg()
     # sweep_gep_putemg()
-    run_no_dp_putemg()
+    # run_no_dp_putemg()
     # run_dp_sgd_putemg()
     # run_no_dp_keypressemg()
     # run_dp_sgd_keypressemg()

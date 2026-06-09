@@ -49,8 +49,12 @@ def get_public_grads_provider(args, net):
         public_targets = torch.randint(high=args.num_classes, size=(num_public_examples,))
         pub_data_grads_provider = PublicDataPerSampleGradProvider(public_data=(public_inputs, public_targets), net=net,
                                                                   public_batchsize=args.batchsize)
-    elif args.aux_dataset == 'keypressemg':
-        from simplegep.data.keypressemg_loader import get_dataloaders
+    elif args.aux_dataset in ['keypressemg', 'putemg']:
+        if args.aux_dataset == 'keypressemg':
+            from simplegep.data.keypressemg_loader import get_dataloaders
+        else:
+            from simplegep.data.putemg_loader import get_dataloaders
+
         import copy
 
         aux_args = copy.copy(args)

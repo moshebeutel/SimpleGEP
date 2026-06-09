@@ -5,7 +5,7 @@ metric:
   name: val_acc
 parameters:
   batchsize:
-    values: [32, 64 ,128]
+    values: [512, 256]
   num_epochs:
     values: [10, 20, 30]
   clip_value:
@@ -17,4 +17,4 @@ parameters:
   num_basis:
     values: [500, 1000]
   grads_history_size:
-    values: [1000, 1500]
+    values: [0]

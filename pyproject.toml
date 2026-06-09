@@ -63,10 +63,12 @@ sweep_gep_putemg = 'simplegep.main:sweep_gep_putemg'
 # single train
 train_no_dp_keypressemg = 'simplegep.main:run_no_dp_keypressemg'
 train_dp_sgd_keypressemg = 'simplegep.main:run_dp_sgd_keypressemg'
+train_gep_keypressemg = 'simplegep.main:run_gep_keypressemg'
 
 # sweep
 sweep_no_dp_keypressemg = 'simplegep.main:sweep_no_dp_keypressemg'
 sweep_dp_sgd_keypressemg = 'simplegep.main:sweep_dp_sgd_keypressemg'
+sweep_gep_keypressemg = 'simplegep.main:sweep_gep_keypressemg'
 
 
 

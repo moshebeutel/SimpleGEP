@@ -1,0 +1,24 @@
+program: gep_trainer.py
+method: grid
+metric:
+  goal: maximize
+  name: val_acc
+parameters:
+  eps:
+    values: [8.0, 1.0, -1.0]
+  seed:
+    values: [20, 30, 40]
+  batchsize:
+    values: [512]
+  num_epochs:
+    values: [30]
+  clip_value:
+    values: [10.0]
+  lr:
+    values: [0.1]
+  weight_decay:
+    values: [0.0005]
+  num_basis:
+    values: [500]
+  grads_history_size:
+    values: [0]

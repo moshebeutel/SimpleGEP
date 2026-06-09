@@ -106,7 +106,7 @@ def sweep_dp_sgd_putemg():
           train_fn=partial(train, logger=logger))
 
 def sweep_gep_putemg():
-    config_yaml_path = 'simplegep/sweepers/sweep_configurations/gep_grid.yaml'
+    config_yaml_path = 'simplegep/sweepers/sweep_configurations/gep_grid_all_eps_seeds.yaml'
     sweep_configuration, args, logger = prepare_sweep(data_name='putemg', dp_method='gep',
                                                       config_yaml_path=config_yaml_path)
     from simplegep.trainers.gep_trainer import train
@@ -150,7 +150,7 @@ def sweep_dp_sgd_keypressemg():
           train_fn=partial(train, logger=logger))
 
 def sweep_gep_keypressemg():
-    config_yaml_path = 'simplegep/sweepers/sweep_configurations/gep_grid.yaml'
+    config_yaml_path = 'simplegep/sweepers/sweep_configurations/gep_grid_all_eps_seeds.yaml'
     sweep_configuration, args, logger = prepare_sweep(data_name='keypressemg', dp_method='gep',
                                                       config_yaml_path=config_yaml_path)
     from simplegep.trainers.gep_trainer import train

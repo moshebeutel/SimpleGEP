@@ -171,13 +171,17 @@ def prepare_sweep(data_name, dp_method, config_yaml_path):
     logger.debug(f'Working dir {working_dir}')
     config_path =  working_dir / config_yaml_path
     assert config_path.exists(), f'config file {config_path} does not exist'
-    seed_parameters = {
-        "seed": {"values": [args.seed]}}
+
     sweep_configuration = load_config(config_path.as_posix())
-    sweep_configuration['parameters'].update(seed_parameters)
-    sweep_name = f"EPS_{args.eps}_{dp_method.upper()}_{args.dataset.upper()}_seed{args.seed}"
-    if args.use_gp:
-        sweep_name = f"GP_{sweep_name}"
+    seed_suffix=""
+    if "seed" not in sweep_configuration['parameters']:
+        seed_parameters = {
+            "seed": {"values": [args.seed]}}
+        sweep_configuration['parameters'].update(seed_parameters)
+        seed_suffix = f"_seed{args.seed}"
+    eps_prefix = f"EPS_{args.eps}_" if "eps" not in sweep_configuration['parameters'] else ""
+    gp_prefix = "GP_" if args.use_gp else ""
+    sweep_name = f"{gp_prefix}{eps_prefix}{dp_method.upper()}_{args.dataset.upper()}{seed_suffix}"
     sweep_configuration['name'] = sweep_name
     return sweep_configuration, args, logger
 

@@ -28,6 +28,13 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor,
         grads_history_container.add(pub_grads)
         pub_grads = grads_history_container.grads
     embedder.calc_embedding_space(pub_grads)
+
+    # clear public grads from gpu memory
+    pub_grads = None
+    del pub_grads
+    gc.collect()
+    torch.cuda.empty_cache()
+
     train_loss, train_acc = 0.0, 0.0
     correct = 0
     total = 0
@@ -79,10 +86,6 @@ def train_epoch(net, loss_function, optimizer, train_loader, grads_processor,
         gc.collect()
         torch.cuda.empty_cache()
 
-    del pub_grads
-    pub_grads = None
-    gc.collect()
-    torch.cuda.empty_cache()
 
     train_acc = 100. * float(correct) / float(total)
     train_loss = train_loss / batch_idx
